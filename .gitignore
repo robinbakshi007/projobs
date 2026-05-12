@@ -1,0 +1,7 @@
+node_modules/
+.venv/
+.venv311/
+dist/
+__pycache__/
+*.pyc
+.DS_Store

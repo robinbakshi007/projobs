@@ -1,0 +1,21 @@
+{
+  "agents": [
+    {
+      "id": "job_hunter_agent",
+      "description": "AI agent that searches job boards, tailors CVs, and auto-applies on behalf of the user.",
+      "skills": ["search-and-apply", "browsing"],
+      "tools": {
+        "allow": ["jobspy_scraper", "python_exec", "browser"]
+      },
+      "context_files": ["USER.md"],
+      "model": "gpt-4o",
+      "settings": {
+        "headful_browser": true,
+        "slow_mo_ms": 1000,
+        "max_daily_applications": 10,
+        "review_mode": true,
+        "submit_enabled": false
+      }
+    }
+  ]
+}
