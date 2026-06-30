@@ -1,0 +1,820 @@
+﻿/* JobDiscovery.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&family=Outfit:wght@300;400;600;700;800&display=swap');
+
+
+.jd-layout-3col {
+  display: grid;
+  grid-template-columns: minmax(180px, 18%) minmax(0, 62%) minmax(230px, 20%);
+  gap: 1rem;
+  align-items: stretch;
+  margin-top: 0.75rem;
+  position: relative;
+  height: calc(100vh - 190px);
+  min-height: 620px;
+}
+
+.jd-layout-3col.left-pane-hidden {
+  grid-template-columns: minmax(0, 1fr) minmax(230px, 20%);
+}
+
+@media (max-width: 900px) {
+  .jd-layout-3col {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 800px) {
+  .jd-layout-3col {
+    grid-template-columns: 1fr;
+  }
+}
+
+.jd-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.jd-left-pane {
+  position: relative;
+}
+
+.jd-pane-toggle {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0f172a;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  position: sticky;
+  top: 0.75rem;
+  z-index: 5;
+  margin: 0 0 -2.6rem 0.75rem;
+}
+
+.job-discovery {
+  height: 100%;
+}
+
+.compact-upload-card {
+  padding: 1rem !important;
+}
+
+.cv-drop-box {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  gap: 0.35rem;
+  min-height: 116px;
+  border: 1px dashed #93c5fd;
+  border-radius: 10px;
+  background: #f8fbff;
+  color: #334155;
+  cursor: pointer;
+  padding: 0.75rem;
+}
+
+.cv-drop-box input {
+  display: none;
+}
+
+.cv-drop-box strong {
+  font-size: 0.92rem;
+  overflow-wrap: anywhere;
+}
+
+.cv-drop-box span {
+  font-size: 0.74rem;
+  color: #64748b;
+}
+
+.compact-setup summary,
+.results-filter-drawer summary {
+  cursor: pointer;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.job-discovery .jd-left-pane input,
+.job-discovery .jd-left-pane select,
+.job-discovery .jd-left-pane button,
+.job-discovery .jd-left-pane textarea {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.job-discovery .jd-left-pane input[type="file"] {
+  width: 100%;
+  overflow: hidden;
+}
+
+.job-discovery .jd-left-pane .cv-parse-controls,
+.job-discovery .jd-left-pane .form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+.job-discovery .jd-left-pane .parse-preview {
+  overflow-wrap: anywhere;
+}
+
+.jd-layout-3col > .jd-col:last-child {
+  overflow: hidden;
+}
+
+/* Enhancing existing sections to fit beautifully inside the columns */
+.job-discovery .cv-parse-lab, 
+.job-discovery .preference-form, 
+.job-discovery .onboarding-panel, 
+.job-discovery .diff-panel, 
+.job-discovery .results-list {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+  padding: 1.5rem;
+  margin: 0; /* Override any existing margins from App.css */
+  border: 1px solid var(--border-light, #e2e8f0);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  height: fit-content;
+}
+
+.job-discovery .jd-col:nth-last-child(1) .diff-panel,
+.job-discovery .jd-col:nth-last-child(1) .results-list,
+.job-discovery .jd-col:nth-last-child(1) .cv-designs-card {
+  padding: 1rem;
+}
+
+.job-discovery .jd-main-pane {
+  overflow-y: auto;
+}
+
+.cv-designs-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+  padding: 1.5rem;
+  border: 1px solid var(--border-light, #e2e8f0);
+}
+
+.cv-designs-card h3 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  font-size: 1.1rem;
+  color: #1e293b;
+}
+
+.cv-designs-card p {
+  color: #64748b;
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.template-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.template-thumbnail {
+  width: 100%;
+  aspect-ratio: 1 / 1.414; /* A4 proportion approx */
+  object-fit: cover;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.template-option:hover .template-thumbnail {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+}
+
+.template-option.selected .template-thumbnail {
+  border-color: #6b46c1; /* Brand color */
+  box-shadow: 0 0 0 4px rgba(107, 70, 193, 0.15);
+}
+
+.template-name {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #475569;
+}
+
+.template-option.selected .template-name {
+  color: #6b46c1;
+  font-weight: 600;
+}
+
+.create-cv-button {
+  width: 100%;
+  margin: 0 0 0.85rem 0;
+}
+
+.apply-template-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #f8fafc;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.apply-template-control input[type="checkbox"] {
+  width: 1.2rem;
+  height: 1.2rem;
+  accent-color: #6b46c1;
+  cursor: pointer;
+  margin: 0;
+}
+
+.apply-template-control label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  margin: 0;
+}
+
+.results-accordion {
+  padding: 0 !important;
+}
+
+.results-accordion summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 1rem;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.results-accordion summary::-webkit-details-marker {
+  display: none;
+}
+
+.results-accordion summary::before {
+  content: "";
+  display: inline-block;
+  margin-right: 0.5rem;
+  transition: transform 0.15s ease;
+}
+
+.results-accordion[open] summary {
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.results-accordion[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.results-accordion .results-filters,
+.results-accordion .small-muted,
+.results-accordion .jobs-table-wrap {
+  margin: 1rem;
+}
+
+/* A4 Editable CV */
+.a4-cv-container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  padding: 3rem;
+  margin: 1.5rem auto;
+  width: 100%;
+  max-width: 794px;
+  height: 1123px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #cbd5e1;
+  transition: all 0.3s ease;
+}
+
+.a4-cv-container.preview-mode {
+  padding: 0;
+  overflow: hidden;
+}
+
+.a4-cv-container.preview-mode .a4-cv-preview {
+  padding: 3rem;
+}
+
+.a4-cv-editor {
+  flex-grow: 1;
+  width: 100%;
+  border: none;
+  resize: none;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  outline: none;
+  background: transparent;
+}
+
+.a4-cv-editor:focus {
+  outline: none;
+}
+
+/* Template Typography & Design Flavors */
+/* Modernist */
+.template-modern {
+  border-top: 8px solid #3b82f6 !important;
+  background: #ffffff !important;
+}
+.template-modern .a4-cv-editor {
+  font-family: 'Inter', 'Roboto', sans-serif;
+  color: #1e293b;
+}
+
+/* Classic Serif */
+.template-classic {
+  background: #fdfbf7 !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.06), inset 0 0 40px rgba(0,0,0,0.02) !important;
+  outline: 1px solid #d1c7bd;
+  outline-offset: -12px;
+}
+.template-classic .a4-cv-editor {
+  font-family: 'Merriweather', 'Georgia', serif;
+  color: #2d3748;
+  line-height: 1.8;
+}
+
+/* Creative Outline */
+.template-creative {
+  border-left: 12px solid #8b5cf6 !important;
+  background: #faf5ff !important;
+}
+.template-creative .a4-cv-editor {
+  font-family: 'Outfit', 'Montserrat', sans-serif;
+  color: #1e1b4b;
+}
+
+.a4-cv-preview {
+  flex-grow: 1;
+  width: 100%;
+  font-size: 0.92rem;
+  line-height: 1.65;
+  color: #24384b;
+  overflow-y: auto;
+}
+
+.a4-cv-preview h4 {
+  margin: 0 0 1rem;
+  color: #0f172a;
+  font-size: 1rem;
+  line-height: 1.45;
+  font-weight: 800;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 0.5rem;
+}
+
+.a4-cv-preview h1 {
+  margin: 0 0 0.25rem;
+  color: #0f172a;
+  font-size: 1.9rem;
+  line-height: 1.15;
+  font-weight: 900;
+}
+
+.a4-cv-preview h2 {
+  margin: 1.4rem 0 0.55rem;
+  color: #0f172a;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 0.5rem;
+}
+
+.a4-cv-preview p {
+  margin: 0 0 0.9rem;
+}
+
+.a4-cv-preview .preview-meta {
+  color: #64748b;
+  font-size: 0.86rem;
+}
+
+.a4-cv-preview .preview-bullet {
+  padding-left: 1rem;
+  position: relative;
+}
+
+.a4-cv-preview .preview-bullet::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  position: absolute;
+  left: 0;
+  top: 0.72em;
+}
+
+.a4-cv-preview .preview-spacer {
+  height: 0.55rem;
+}
+
+/* Template Typography Flavors */
+.template-modern .a4-cv-editor,
+.template-modern .a4-cv-preview {
+  font-family: 'Inter', 'Roboto', sans-serif;
+  color: #1e293b;
+}
+
+.template-modern.preview-mode {
+  border-top: none !important;
+}
+
+.template-modern .a4-cv-preview {
+  border-top: 8px solid #3b82f6;
+  padding-top: 2.5rem;
+}
+
+.template-modern .a4-cv-preview h1,
+.template-modern .a4-cv-preview h2 {
+  color: #1d4ed8;
+}
+
+.template-modern .a4-cv-preview h2 {
+  border-bottom-color: #bfdbfe;
+}
+
+.template-classic .a4-cv-editor,
+.template-classic .a4-cv-preview {
+  font-family: 'Merriweather', 'Georgia', serif;
+  color: #334155;
+}
+
+.template-classic .a4-cv-preview {
+  background: #fdfbf7;
+}
+
+.template-classic .a4-cv-preview h1,
+.template-classic .a4-cv-preview .preview-meta {
+  text-align: center;
+}
+
+.template-classic .a4-cv-preview h1 {
+  font-family: Georgia, serif;
+  letter-spacing: 0.03em;
+}
+
+.template-classic .a4-cv-preview h2 {
+  color: #6f4e37;
+  border-bottom-color: #d1c7bd;
+}
+
+.template-creative .a4-cv-editor,
+.template-creative .a4-cv-preview {
+  font-family: 'Outfit', 'Montserrat', sans-serif;
+  color: #0f172a;
+}
+
+.template-creative.preview-mode {
+  border-left: none !important;
+  background: #ffffff !important;
+}
+
+.template-creative .a4-cv-preview {
+  background: linear-gradient(90deg, #312e81 0 24%, #ffffff 24% 100%);
+  padding-left: 30%;
+  color: #1e1b4b;
+}
+
+.template-creative .a4-cv-preview h1 {
+  color: #312e81;
+}
+
+.template-creative .a4-cv-preview h2 {
+  color: #7c3aed;
+  border-bottom-color: #ddd6fe;
+}
+
+/* A4 Document Editor Tabs */
+.a4-editor-wrapper {
+  margin: 0;
+}
+.a4-tab-headers {
+  display: flex;
+  gap: 0.25rem;
+  background: #f1f5f9;
+  padding: 0.25rem 0.25rem 0 0.25rem;
+  border-radius: 8px 8px 0 0;
+  border: 1px solid #e2e8f0;
+  border-bottom: none;
+}
+.a4-tab-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 0.5rem 1rem;
+  border-radius: 6px 6px 0 0;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #64748b;
+  transition: all 0.2s ease;
+  margin-bottom: -1px;
+}
+.a4-tab-btn:hover {
+  color: #0f172a;
+}
+.a4-tab-btn.active {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  border-bottom-color: #ffffff;
+  color: #6b46c1;
+}
+.a4-hint {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  text-align: center;
+  margin-top: 0.5rem;
+}
+
+.jd-col .diff-stats,
+.jd-col .template-grid,
+.jd-col .results-filters {
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)) !important;
+}
+
+.jd-col .system-row,
+.jd-col .rec-row,
+.jd-col .issue-row,
+.jd-col .suggestion-row,
+.jd-col .grammar-row,
+.jd-col .rewrite-row {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.hermes-scheduler-card {
+  border: 1px solid #dbeafe;
+  border-left: 4px solid #2563eb;
+  border-radius: 8px;
+  background: #f8fbff;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.hermes-scheduler-card h5 {
+  margin: 0 0 0.35rem;
+  color: #1e293b;
+}
+
+.hermes-scheduler-card p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.hermes-scheduler-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.hermes-scheduler-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.hermes-scheduler-grid input,
+.hermes-scheduler-grid select {
+  min-width: 0;
+  width: 100%;
+}
+
+.hermes-check {
+  justify-content: end;
+}
+
+.hermes-check input {
+  width: auto;
+}
+
+.hermes-runbook {
+  display: grid;
+  gap: 0.35rem;
+  color: #334155;
+  font-size: 0.82rem;
+}
+
+/* Auto-Apply Stepper Console */
+.auto-apply-progress-panel {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin: 1.25rem 0;
+  font-family: monospace;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+}
+.auto-apply-progress-panel h4 {
+  color: #38bdf8;
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+  font-family: sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.progress-bar-container {
+  background: #1e293b;
+  border-radius: 4px;
+  height: 8px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+.progress-bar-fill {
+  background: linear-gradient(90deg, #38bdf8, #818cf8);
+  height: 100%;
+  transition: width 0.3s ease;
+}
+.progress-percentage {
+  text-align: right;
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin-bottom: 0.75rem;
+}
+.apply-logs-console {
+  max-height: 120px;
+  overflow-y: auto;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: #e2e8f0;
+  border-top: 1px solid #1e293b;
+  padding-top: 0.75rem;
+}
+.console-line {
+  margin-bottom: 0.25rem;
+}
+
+/* Salesforce active job tabbed workspace styles */
+.sf-console-workspace {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+  padding: 1.5rem;
+  border: 1px solid var(--border-light, #e2e8f0);
+}
+.sf-workspace-header {
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.sf-workspace-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #1e293b;
+}
+.sf-workspace-header .company {
+  font-size: 0.9rem;
+  color: #64748b;
+}
+.sf-workspace-tabs {
+  display: flex;
+  gap: 0.5rem;
+  background: #f1f5f9;
+  padding: 0.35rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  overflow-x: auto;
+}
+.sf-tab-btn {
+  background: transparent;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #64748b;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.sf-tab-btn:hover {
+  color: #0f172a;
+  background: rgba(0, 0, 0, 0.03);
+}
+.sf-tab-btn.active {
+  background: #ffffff;
+  color: #6b46c1;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.sf-workspace-content {
+  min-height: 400px;
+}
+.ai-match-studio-card {
+  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+.badge-match-reason {
+  background: #dcfce7;
+  color: #166534;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-weight: bold;
+}
+.badge-missing-reason {
+  background: #ffe4e6;
+  color: #991b1b;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.doc-style-switcher {
+  display: inline-flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.doc-style-switcher button {
+  background: #ffffff;
+  color: #334155;
+  border-color: #cbd5e1;
+  text-transform: capitalize;
+}
+
+.doc-style-switcher button.active {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-color: #93c5fd;
+}
+
+.role-alignment-box,
+.visible-alignment-action {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.role-alignment-box h5,
+.visible-alignment-action h5 {
+  margin: 0 0 0.5rem 0;
+  color: #166534;
+  font-size: 0.9rem;
+}
+
+.role-alignment-box p,
+.visible-alignment-action p {
+  margin: 0 0 0.75rem 0;
+  color: #14532d;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 1200px) {
+  .jd-layout-3col {
+    grid-template-columns: minmax(170px, 22%) minmax(0, 50%) minmax(220px, 28%);
+  }
+
+  .jd-layout-3col.left-pane-hidden {
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 28%);
+  }
+
+  .hermes-scheduler-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+

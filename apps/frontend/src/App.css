@@ -58,8 +58,8 @@
   top: 12px;
   flex-shrink: 0;
   width: 260px;
-  background: #0f2333;
-  border: 1px solid #193449;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #d7e4ef;
   border-radius: 16px;
   padding: 16px;
   display: flex;
@@ -67,10 +67,54 @@
   gap: 8px;
   max-height: calc(100vh - 24px);
   overflow-y: auto;
+  box-shadow: 0 14px 38px rgba(47, 86, 120, 0.12);
+}
+
+.sidebar-is-collapsed .admin-sidebar {
+  width: 48px;
+  padding: 10px 6px;
+  align-items: center;
+}
+
+.sidebar-collapse-toggle {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  align-self: flex-end;
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.sidebar-is-collapsed .sidebar-collapse-toggle {
+  align-self: center;
+}
+
+.sidebar-tree {
+  border-top: 1px solid #e2e8f0;
+  margin-top: 8px;
+  padding-top: 8px;
+  display: grid;
+  gap: 4px;
+}
+
+.sidebar-tree strong {
+  color: #668098;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 8px 4px 4px;
+}
+
+.sidebar-tree button {
+  font-size: 0.82rem;
+  padding: 7px 10px 7px 22px;
+  color: #53687d;
 }
 
 .admin-sidebar h3 {
-  color: #9dc5e6;
+  color: #668098;
   font-size: 11px;
   margin: 6px 4px;
   letter-spacing: 0.1em;
@@ -84,7 +128,7 @@
 .admin-sidebar button {
   text-align: left;
   background: transparent;
-  color: #d8e6f3;
+  color: #2f4356;
   border: 1px solid transparent;
   border-radius: 10px;
   padding: 10px 12px;
@@ -96,21 +140,22 @@
 
 .admin-sidebar button:hover {
   transform: none;
-  border-color: #35516a;
-  background: #173146;
+  border-color: #c8d8e6;
+  background: #eef6ff;
 }
 
 .admin-sidebar button.active {
-  background: #1e8fff;
+  background: #dbeafe;
   color: #ffffff;
-  border-color: #1e8fff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
 }
 
 .impersonation-bar {
   margin-top: 10px;
   padding: 10px;
-  background: #1a3a52;
-  border: 1px solid #2a5a7a;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
   border-radius: 10px;
   display: flex;
   justify-content: space-between;
@@ -119,7 +164,7 @@
 }
 
 .impersonation-bar span {
-  color: #d8e6f3;
+  color: #35516a;
   font-size: 13px;
 }
 
@@ -136,6 +181,71 @@
   min-width: 0;
   overflow-x: hidden;
   padding: 0 16px;
+}
+
+.copilot-toggle {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #0f172a;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.sf-ai-copilot-panel.is-collapsed {
+  align-items: center;
+}
+
+.sf-ai-copilot-panel.is-collapsed .copilot-header {
+  width: 100%;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.copilot-rail-label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #4338ca;
+  letter-spacing: 0;
+}
+
+.capability-buildout-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.capability-buildout-card {
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 14px;
+}
+
+.capability-buildout-card div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.capability-buildout-card span {
+  color: #047857;
+  font-weight: 800;
+}
+
+.capability-buildout-card p {
+  margin: 8px 0;
+  color: #334155;
+  font-size: 0.9rem;
+}
+
+.capability-buildout-card small {
+  color: #64748b;
 }
 
 .admin-grid {
