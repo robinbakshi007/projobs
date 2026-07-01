@@ -1,4 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
+import { type CSSProperties } from "react";
 import "./JobDiscovery.css";
 import { jobController } from "../controllers/JobController";
 import { automationController } from "../controllers/AutomationController";
@@ -39,6 +40,35 @@ type ExperienceLevel = "entry" | "mid" | "senior" | "lead";
 type WorkArrangement = "remote" | "onsite" | "hybrid";
 
 type RoleType = "full_time" | "part_time" | "contract" | "casual" | "internship";
+type TemplateStyle = "modern" | "classic" | "creative";
+type FontOptionValue = "Inter" | "Manrope" | "Merriweather" | "Playfair Display" | "Lora" | "IBM Plex Sans" | "Outfit";
+type StudioTab = "fonts" | "colors" | "photo" | "layout" | "sections" | "export";
+
+type SavedStylePreset = {
+  id: string;
+  name: string;
+  headingFont: FontOptionValue;
+  bodyFont: FontOptionValue;
+  textColor: string;
+  accentColor: string;
+  paperColor: string;
+  backgroundColor: string;
+  sidebarColor: string;
+  lineHeightScale: number;
+  fontScale: number;
+  sidebarWidth: number;
+  sectionDensity: number;
+};
+
+type ResumeVariant = {
+  id: string;
+  name: string;
+  template: TemplateStyle;
+  cv: string;
+  coverLetter: string;
+  photo: string | null;
+  sections: string[];
+};
 
 interface ScoredJob extends JobResult {
   preferenceScore: number;
@@ -219,6 +249,255 @@ function encodeRoleTypes(roleTypes: RoleType[]): string[] {
   return roleTypes.map((type) => `role_type:${type}`);
 }
 
+function ResumeIcon({ name }: { name: "phone" | "link" | "map" | "camera" | "spark" }) {
+  const common = { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+
+  if (name === "phone") {
+    return <svg {...common}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72l.34 2.71a2 2 0 0 1-.57 1.72l-1.3 1.3a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 1.72-.57l2.71.34A2 2 0 0 1 22 16.92z" /></svg>;
+  }
+  if (name === "link") {
+    return <svg {...common}><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11 4" /><path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07L13 19" /></svg>;
+  }
+  if (name === "map") {
+    return <svg {...common}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>;
+  }
+  if (name === "camera") {
+    return <svg {...common}><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>;
+  }
+  return <svg {...common}><path d="M12 2l2.4 5.2L20 9l-4 3.9.94 5.6L12 15.8l-4.94 2.7L8 12.9 4 9l5.6-1.8L12 2z" /></svg>;
+}
+
+const TEMPLATE_LABELS: Record<TemplateStyle, string> = {
+  modern: "Modern",
+  classic: "Classic",
+  creative: "Creative",
+};
+
+const TEMPLATE_SUMMARIES: Record<TemplateStyle, string> = {
+  modern: "A modern CV profile tailored to your target role. Replace this with a truthful summary of your experience, strengths, and measurable outcomes.",
+  classic: "A polished classic CV summary focused on dependable experience, leadership, and results. Replace this with a truthful overview of your background.",
+  creative: "A bold creative profile that highlights your story, strengths, and measurable wins. Replace this with a truthful summary aligned to your target role.",
+};
+
+const GOOGLE_FONT_OPTIONS: Array<{ label: string; value: FontOptionValue }> = [
+  { label: "Inter", value: "Inter" },
+  { label: "Manrope", value: "Manrope" },
+  { label: "Merriweather", value: "Merriweather" },
+  { label: "Playfair Display", value: "Playfair Display" },
+  { label: "Lora", value: "Lora" },
+  { label: "IBM Plex Sans", value: "IBM Plex Sans" },
+  { label: "Outfit", value: "Outfit" },
+];
+
+const THEME_PRESETS = [
+  {
+    id: "executive",
+    label: "Executive",
+    text: "#24384b",
+    accent: "#1f4f82",
+    paper: "#ffffff",
+    background: "#f8fafc",
+    sidebar: "#eef3f8",
+  },
+  {
+    id: "minimal",
+    label: "Minimal",
+    text: "#1f2937",
+    accent: "#111827",
+    paper: "#ffffff",
+    background: "#f8fafc",
+    sidebar: "#f3f4f6",
+  },
+  {
+    id: "corporate",
+    label: "Corporate",
+    text: "#1e3a5f",
+    accent: "#2563eb",
+    paper: "#ffffff",
+    background: "#eff6ff",
+    sidebar: "#dbeafe",
+  },
+  {
+    id: "creative",
+    label: "Creative",
+    text: "#ede9fe",
+    accent: "#8b5cf6",
+    paper: "#ffffff",
+    background: "#1e1b4b",
+    sidebar: "#312e81",
+  },
+  {
+    id: "tech",
+    label: "Tech",
+    text: "#0f172a",
+    accent: "#06b6d4",
+    paper: "#ffffff",
+    background: "#ecfeff",
+    sidebar: "#083344",
+  },
+] as const;
+
+function createStarterCv(template: TemplateStyle) {
+  const summary = TEMPLATE_SUMMARIES[template];
+
+  if (template === "creative") {
+    return [
+      "Your Name",
+      "City, Country | phone@email.com | LinkedIn",
+      "",
+      "Professional Summary",
+      summary,
+      "",
+      "Core Skills",
+      "Stakeholder management | Process improvement | Data analysis | Delivery planning | Communication",
+      "",
+      "Signature Wins",
+      "- Delivered a measurable outcome that shows impact.",
+      "- Improved a workflow, team metric, or customer result.",
+      "",
+      "Professional Experience",
+      "Job Title | Company Name | Location",
+      "MM/YYYY - MM/YYYY",
+      "- Add a high-impact achievement with a measurable outcome.",
+      "- Add a responsibility that matches your target role.",
+      "",
+      "Education",
+      "Qualification | Institution | Year",
+    ].join("\n");
+  }
+
+  if (template === "classic") {
+    return [
+      "Your Name",
+      "Executive Title",
+      "phone@email.com | LinkedIn | Location",
+      "",
+      "Professional Summary",
+      summary,
+      "",
+      "Professional Experience",
+      "Job Title | Company Name | Location",
+      "MM/YYYY - MM/YYYY",
+      "- Add an achievement with a measurable outcome.",
+      "- Add a responsibility that matches your target role.",
+      "",
+      "Certifications",
+      "PMP",
+      "CFA",
+      "",
+      "Languages",
+      "English",
+      "French",
+      "",
+      "Core Skills",
+      "Strategic planning",
+      "Leadership",
+      "Financial analysis",
+      "Project management",
+      "",
+      "Education",
+      "Qualification | Institution | Year",
+    ].join("\n");
+  }
+
+  return [
+    "Your Name",
+    "Target Role Title",
+    "",
+    "Contact",
+    "phone@email.com",
+    "LinkedIn / portfolio",
+    "Location",
+    "",
+    "Core Skills",
+    "Stakeholder management",
+    "Process improvement",
+    "Data analysis",
+    "Delivery planning",
+    "Communication",
+    "",
+    "Languages",
+    "English: Native",
+    "German: B2",
+    "",
+    "Professional Summary",
+    summary,
+    "",
+    "Professional Experience",
+    "Job Title | Company Name",
+    "MM/YYYY - Present | Location",
+    "- Add an achievement with a measurable outcome.",
+    "- Add a responsibility that matches your target role.",
+    "",
+    "Projects",
+    "Key project",
+    "- Add a project highlight linked to business impact.",
+    "",
+    "Education",
+    "Qualification | Institution | Year",
+  ].join("\n");
+}
+
+function createStarterCoverLetter(template: TemplateStyle) {
+  const label = TEMPLATE_LABELS[template];
+  return [
+    "Your Name",
+    "City, Country | phone@email.com | LinkedIn",
+    "",
+    "Dear Hiring Manager,",
+    "",
+    `I am writing to apply for this opportunity with a ${label.toLowerCase()} cover letter that reflects my real experience and strengths. Replace this paragraph with a truthful opening tailored to the role and company.`,
+    "",
+    "I bring relevant experience, measurable outcomes, and practical strengths that align with the job requirements. Replace this paragraph with evidence-based examples from your background.",
+    "",
+    "Thank you for your time and consideration. I would welcome the opportunity to discuss how I can contribute.",
+    "",
+    "Sincerely,",
+    "Your Name",
+  ].join("\n");
+}
+
+function parseDocumentSections(content: string) {
+  const lines = content
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const sections = new Map<string, string[]>();
+  const sectionNames = new Set([
+    "Professional Summary",
+    "Core Skills",
+    "Professional Experience",
+    "Education",
+    "Role Alignment",
+    "Signature Wins",
+    "Contact",
+    "Languages",
+    "Projects",
+    "Certifications",
+  ]);
+
+  const header = lines[0] ?? "Your Name";
+  const meta = lines[1] ?? "City, Country | phone@email.com | LinkedIn";
+  let currentSection = "intro";
+
+  for (const line of lines.slice(2)) {
+    if (sectionNames.has(line)) {
+      currentSection = line;
+      sections.set(currentSection, []);
+      continue;
+    }
+
+    if (!sections.has(currentSection)) {
+      sections.set(currentSection, []);
+    }
+
+    sections.get(currentSection)?.push(line);
+  }
+
+  return { header, meta, sections };
+}
+
 function inferExperienceLevel(text: string): ExperienceLevel {
   const lower = text.toLowerCase();
   const yearsMatch = lower.match(/(\d+)\+?\s+years?/);
@@ -323,6 +602,9 @@ async function extractCvText(file: File): Promise<string> {
 }
 
 export default function JobDiscovery() {
+  const studioStorageKey = "job_discovery_cv_studio_v2";
+  const variantStorageKey = "job_discovery_cv_variants_v1";
+  const presetStorageKey = "job_discovery_cv_presets_v1";
   const [preference, setPreference] = useState<Preference | null>(null);
   const [results, setResults] = useState<JobResult[]>([]);
   const [roleTitle, setRoleTitle] = useState("");
@@ -366,7 +648,47 @@ export default function JobDiscovery() {
   const [autoApplyStatus, setAutoApplyStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState("modern");
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateStyle>("modern");
+  const [selectedHeadingFont, setSelectedHeadingFont] = useState<FontOptionValue>("Inter");
+  const [selectedBodyFont, setSelectedBodyFont] = useState<FontOptionValue>("Inter");
+  const [textColor, setTextColor] = useState("#24384b");
+  const [accentColor, setAccentColor] = useState("#1f4f82");
+  const [paperColor, setPaperColor] = useState("#ffffff");
+  const [backgroundColor, setBackgroundColor] = useState("#f8fafc");
+  const [sidebarColor, setSidebarColor] = useState("#eef3f8");
+  const [lineHeightScale, setLineHeightScale] = useState(1.65);
+  const [fontScale, setFontScale] = useState(100);
+  const [sidebarWidth, setSidebarWidth] = useState(25);
+  const [sectionDensity, setSectionDensity] = useState(100);
+  const [dividerStyle, setDividerStyle] = useState<"solid" | "dashed" | "none">("solid");
+  const [selectedSections, setSelectedSections] = useState<string[]>([
+    "Contact",
+    "Core Skills",
+    "Languages",
+    "Professional Summary",
+    "Professional Experience",
+    "Projects",
+    "Education",
+    "Certifications",
+    "Role Alignment",
+    "Signature Wins",
+  ]);
+  const [studioTab, setStudioTab] = useState<StudioTab>("fonts");
+  const [profilePhotoGallery, setProfilePhotoGallery] = useState<string[]>([]);
+  const [selectedProfilePhoto, setSelectedProfilePhoto] = useState<string | null>(null);
+  const [photoZoom, setPhotoZoom] = useState(1);
+  const [photoBrightness, setPhotoBrightness] = useState(100);
+  const [photoContrast, setPhotoContrast] = useState(100);
+  const [photoX, setPhotoX] = useState(50);
+  const [photoY, setPhotoY] = useState(35);
+  const [photoRoundness, setPhotoRoundness] = useState(50);
+  const [savedStylePresets, setSavedStylePresets] = useState<SavedStylePreset[]>([]);
+  const [stylePresetName, setStylePresetName] = useState("");
+  const [resumeVariants, setResumeVariants] = useState<ResumeVariant[]>([]);
+  const [variantName, setVariantName] = useState("");
+  const [customSectionName, setCustomSectionName] = useState("");
+  const [shareResumeUrl, setShareResumeUrl] = useState("");
+  const [designAssistantNotes, setDesignAssistantNotes] = useState<string[]>([]);
   const [applyTemplateCheckbox, setApplyTemplateCheckbox] = useState(false);
   const [editableCoverLetterContent, setEditableCoverLetterContent] = useState("");
   const [activeDocTab, setActiveDocTab] = useState<'cv' | 'coverletter'>('cv');
@@ -377,6 +699,39 @@ export default function JobDiscovery() {
 
   const [jobUrlInput, setJobUrlInput] = useState("");
   const [isGroundingUrl, setIsGroundingUrl] = useState(false);
+
+  useEffect(() => {
+    if (selectedTemplate === "modern") {
+      setSelectedHeadingFont("Inter");
+      setSelectedBodyFont("Inter");
+      setTextColor("#24384b");
+      setAccentColor("#2563eb");
+      setPaperColor("#ffffff");
+      setBackgroundColor("#f8fafc");
+      setSidebarColor("#eef3f8");
+      setSidebarWidth(25);
+    }
+    if (selectedTemplate === "classic") {
+      setSelectedHeadingFont("Playfair Display");
+      setSelectedBodyFont("Merriweather");
+      setTextColor("#2f2a25");
+      setAccentColor("#342b24");
+      setPaperColor("#ffffff");
+      setBackgroundColor("#f4f2ee");
+      setSidebarColor("#ffffff");
+      setSidebarWidth(38);
+    }
+    if (selectedTemplate === "creative") {
+      setSelectedHeadingFont("Outfit");
+      setSelectedBodyFont("Manrope");
+      setTextColor("#1e1b4b");
+      setAccentColor("#8b5cf6");
+      setPaperColor("#ffffff");
+      setBackgroundColor("#1e1b4b");
+      setSidebarColor("#312e81");
+      setSidebarWidth(28);
+    }
+  }, [selectedTemplate]);
 
   useEffect(() => {
     loadPreferences();
@@ -411,6 +766,101 @@ export default function JobDiscovery() {
       setSpeechRecognitionInstance(rec);
     }
   }, []);
+
+  useEffect(() => {
+    try {
+      const savedStudio = localStorage.getItem(studioStorageKey);
+      if (savedStudio) {
+        const parsed = JSON.parse(savedStudio) as Record<string, unknown>;
+        if (typeof parsed.selectedHeadingFont === "string") setSelectedHeadingFont(parsed.selectedHeadingFont as FontOptionValue);
+        if (typeof parsed.selectedBodyFont === "string") setSelectedBodyFont(parsed.selectedBodyFont as FontOptionValue);
+        if (typeof parsed.textColor === "string") setTextColor(parsed.textColor);
+        if (typeof parsed.accentColor === "string") setAccentColor(parsed.accentColor);
+        if (typeof parsed.paperColor === "string") setPaperColor(parsed.paperColor);
+        if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
+        if (typeof parsed.sidebarColor === "string") setSidebarColor(parsed.sidebarColor);
+        if (typeof parsed.lineHeightScale === "number") setLineHeightScale(parsed.lineHeightScale);
+        if (typeof parsed.fontScale === "number") setFontScale(parsed.fontScale);
+        if (typeof parsed.sidebarWidth === "number") setSidebarWidth(parsed.sidebarWidth);
+        if (typeof parsed.sectionDensity === "number") setSectionDensity(parsed.sectionDensity);
+        if (typeof parsed.dividerStyle === "string") setDividerStyle(parsed.dividerStyle as "solid" | "dashed" | "none");
+        if (Array.isArray(parsed.profilePhotoGallery)) setProfilePhotoGallery(parsed.profilePhotoGallery.filter((item): item is string => typeof item === "string"));
+        if (typeof parsed.selectedProfilePhoto === "string") setSelectedProfilePhoto(parsed.selectedProfilePhoto);
+        if (typeof parsed.photoZoom === "number") setPhotoZoom(parsed.photoZoom);
+        if (typeof parsed.photoBrightness === "number") setPhotoBrightness(parsed.photoBrightness);
+        if (typeof parsed.photoContrast === "number") setPhotoContrast(parsed.photoContrast);
+        if (typeof parsed.photoX === "number") setPhotoX(parsed.photoX);
+        if (typeof parsed.photoY === "number") setPhotoY(parsed.photoY);
+        if (typeof parsed.photoRoundness === "number") setPhotoRoundness(parsed.photoRoundness);
+        if (Array.isArray(parsed.selectedSections)) setSelectedSections(parsed.selectedSections.filter((item): item is string => typeof item === "string"));
+      }
+      const savedPresets = localStorage.getItem(presetStorageKey);
+      if (savedPresets) setSavedStylePresets(JSON.parse(savedPresets) as SavedStylePreset[]);
+      const savedVariants = localStorage.getItem(variantStorageKey);
+      if (savedVariants) setResumeVariants(JSON.parse(savedVariants) as ResumeVariant[]);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(
+      studioStorageKey,
+      JSON.stringify({
+        selectedHeadingFont,
+        selectedBodyFont,
+        textColor,
+        accentColor,
+        paperColor,
+        backgroundColor,
+        sidebarColor,
+        lineHeightScale,
+        fontScale,
+        sidebarWidth,
+        sectionDensity,
+        dividerStyle,
+        profilePhotoGallery,
+        selectedProfilePhoto,
+        photoZoom,
+        photoBrightness,
+        photoContrast,
+        photoX,
+        photoY,
+        photoRoundness,
+        selectedSections,
+      })
+    );
+  }, [
+    selectedHeadingFont,
+    selectedBodyFont,
+    textColor,
+    accentColor,
+    paperColor,
+    backgroundColor,
+    sidebarColor,
+    lineHeightScale,
+    fontScale,
+    sidebarWidth,
+    sectionDensity,
+    dividerStyle,
+    profilePhotoGallery,
+    selectedProfilePhoto,
+    photoZoom,
+    photoBrightness,
+    photoContrast,
+    photoX,
+    photoY,
+    photoRoundness,
+    selectedSections,
+  ]);
+
+  useEffect(() => {
+    localStorage.setItem(presetStorageKey, JSON.stringify(savedStylePresets));
+  }, [savedStylePresets]);
+
+  useEffect(() => {
+    localStorage.setItem(variantStorageKey, JSON.stringify(resumeVariants));
+  }, [resumeVariants]);
 
 
   const loadPreferences = async () => {
@@ -932,55 +1382,508 @@ Key Requirements:
     }
   };
 
-  const createCvFromSelectedDesign = () => {
-    const styleLabel = selectedTemplate.charAt(0).toUpperCase() + selectedTemplate.slice(1);
-    const starterCv = [
-      "Your Name",
-      "City, Country | phone@email.com | LinkedIn",
-      "",
-      "Professional Summary",
-      `A concise ${styleLabel} CV profile tailored to your target role. Replace this with a truthful summary of your experience, strengths, and measurable outcomes.`,
-      "",
-      "Core Skills",
-      "Stakeholder management | Process improvement | Data analysis | Delivery planning | Communication",
-      "",
-      "Professional Experience",
-      "Job Title | Company Name | Location",
-      "MM/YYYY - MM/YYYY",
-      "- Add an achievement with a measurable outcome.",
-      "- Add a responsibility that matches your target role.",
-      "",
-      "Education",
-      "Qualification | Institution | Year",
-    ].join("\n");
+  const cvFontStyle: CSSProperties = {
+    ["--cv-heading-font" as string]: `'${selectedHeadingFont}', sans-serif`,
+    ["--cv-body-font" as string]: `'${selectedBodyFont}', sans-serif`,
+    ["--cv-text-color" as string]: textColor,
+    ["--cv-accent-color" as string]: accentColor,
+    ["--cv-paper-color" as string]: paperColor,
+    ["--cv-background-color" as string]: backgroundColor,
+    ["--cv-sidebar-color" as string]: sidebarColor,
+    ["--cv-line-height" as string]: String(lineHeightScale),
+    ["--cv-font-scale" as string]: `${fontScale}%`,
+    ["--cv-sidebar-width" as string]: `${sidebarWidth}%`,
+    ["--cv-section-density" as string]: `${sectionDensity}%`,
+    ["--cv-divider-style" as string]: dividerStyle,
+  };
 
-    setEditableCvContent(starterCv);
-    setEditableCoverLetterContent("");
+  const toggleSectionVisibility = (sectionName: string) => {
+    setSelectedSections((current) =>
+      current.includes(sectionName)
+        ? current.filter((name) => name !== sectionName)
+        : [...current, sectionName]
+    );
+  };
+
+  const moveSection = (sectionName: string, direction: -1 | 1) => {
+    setSelectedSections((current) => {
+      const index = current.indexOf(sectionName);
+      if (index === -1) return current;
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= current.length) return current;
+      const updated = [...current];
+      [updated[index], updated[nextIndex]] = [updated[nextIndex], updated[index]];
+      return updated;
+    });
+  };
+
+  const addCustomSection = () => {
+    const trimmed = customSectionName.trim();
+    if (!trimmed) return;
+    if (!selectedSections.includes(trimmed)) {
+      setSelectedSections((current) => [...current, trimmed]);
+    }
+    setEditableCvContent((current) => `${current.trim()}\n\n${trimmed}\n- Add details here.`);
+    setCustomSectionName("");
+  };
+
+  const applyThemePreset = (presetId: string) => {
+    const preset = THEME_PRESETS.find((item) => item.id === presetId);
+    if (!preset) return;
+    setTextColor(preset.text);
+    setAccentColor(preset.accent);
+    setPaperColor(preset.paper);
+    setBackgroundColor(preset.background);
+    setSidebarColor(preset.sidebar);
+  };
+
+  const handleProfilePhotoUpload = (file: File | null) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      if (!result) return;
+      setProfilePhotoGallery((current) => [result, ...current.filter((item) => item !== result).slice(0, 5)]);
+      setSelectedProfilePhoto(result);
+      setPhotoZoom(1.1);
+      setPhotoBrightness(102);
+      setPhotoContrast(104);
+      setPhotoX(50);
+      setPhotoY(35);
+      setPhotoRoundness(selectedTemplate === "modern" ? 50 : 16);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const autoFramePhoto = () => {
+    setPhotoZoom(1.12);
+    setPhotoBrightness(104);
+    setPhotoContrast(106);
+    setPhotoX(50);
+    setPhotoY(32);
+  };
+
+  const atsDesignWarnings = useMemo(() => {
+    const warnings: string[] = [];
+    const isVeryLightText = textColor.toLowerCase() === "#ffffff" || textColor.toLowerCase() === "#f8fafc";
+    if (isVeryLightText) warnings.push("Light text may reduce readability in ATS exports.");
+    if (selectedProfilePhoto) warnings.push("Profile photos can be useful visually, but keep a photo-free variant for strict ATS submissions.");
+    if (selectedTemplate === "creative") warnings.push("Creative layouts can score lower on conservative ATS pipelines. Use Modern or Classic for safer submissions.");
+    if (fontScale > 112) warnings.push("Large font scale may push content beyond one page.");
+    if (sidebarWidth > 38 && selectedTemplate !== "classic") warnings.push("A wide sidebar reduces content space for experience and projects.");
+    return warnings;
+  }, [textColor, selectedProfilePhoto, selectedTemplate, fontScale, sidebarWidth]);
+
+  const removeCurrentPhoto = () => {
+    if (!selectedProfilePhoto) return;
+    setProfilePhotoGallery((current) => current.filter((photo) => photo !== selectedProfilePhoto));
+    setSelectedProfilePhoto((current) => {
+      const remaining = profilePhotoGallery.filter((photo) => photo !== current);
+      return remaining[0] ?? null;
+    });
+  };
+
+  const saveCurrentStylePreset = () => {
+    const trimmedName = stylePresetName.trim() || `${selectedTemplate} preset`;
+    const preset: SavedStylePreset = {
+      id: `preset-${Date.now()}`,
+      name: trimmedName,
+      headingFont: selectedHeadingFont,
+      bodyFont: selectedBodyFont,
+      textColor,
+      accentColor,
+      paperColor,
+      backgroundColor,
+      sidebarColor,
+      lineHeightScale,
+      fontScale,
+      sidebarWidth,
+      sectionDensity,
+    };
+    setSavedStylePresets((current) => [preset, ...current.filter((item) => item.name !== preset.name)].slice(0, 8));
+    setStylePresetName("");
+  };
+
+  const applySavedStylePreset = (preset: SavedStylePreset) => {
+    setSelectedHeadingFont(preset.headingFont);
+    setSelectedBodyFont(preset.bodyFont);
+    setTextColor(preset.textColor);
+    setAccentColor(preset.accentColor);
+    setPaperColor(preset.paperColor);
+    setBackgroundColor(preset.backgroundColor);
+    setSidebarColor(preset.sidebarColor);
+    setLineHeightScale(preset.lineHeightScale);
+    setFontScale(preset.fontScale);
+    setSidebarWidth(preset.sidebarWidth);
+    setSectionDensity(preset.sectionDensity);
+  };
+
+  const saveResumeVariant = () => {
+    const trimmedName = variantName.trim() || `${TEMPLATE_LABELS[selectedTemplate]} variant`;
+    const variant: ResumeVariant = {
+      id: `variant-${Date.now()}`,
+      name: trimmedName,
+      template: selectedTemplate,
+      cv: editableCvContent,
+      coverLetter: editableCoverLetterContent,
+      photo: selectedProfilePhoto,
+      sections: selectedSections,
+    };
+    setResumeVariants((current) => [variant, ...current.filter((item) => item.name !== variant.name)].slice(0, 10));
+    setVariantName("");
+  };
+
+  const duplicateResumeVariant = (variant: ResumeVariant) => {
+    setResumeVariants((current) => [
+      {
+        ...variant,
+        id: `variant-${Date.now()}`,
+        name: `${variant.name} Copy`,
+      },
+      ...current,
+    ].slice(0, 10));
+  };
+
+  const renameResumeVariant = (variantId: string) => {
+    const nextName = window.prompt("Rename resume variant");
+    if (!nextName?.trim()) return;
+    setResumeVariants((current) =>
+      current.map((variant) => variant.id === variantId ? { ...variant, name: nextName.trim() } : variant)
+    );
+  };
+
+  const deleteResumeVariant = (variantId: string) => {
+    setResumeVariants((current) => current.filter((variant) => variant.id !== variantId));
+  };
+
+  const loadResumeVariant = (variant: ResumeVariant) => {
+    setSelectedTemplate(variant.template);
+    setEditableCvContent(variant.cv);
+    setEditableCoverLetterContent(variant.coverLetter);
+    setSelectedProfilePhoto(variant.photo);
+    setSelectedSections(variant.sections);
+    setDocPreviewMode(true);
+  };
+
+  const createShareLink = () => {
+    const payload = encodeURIComponent(
+      JSON.stringify({
+        template: selectedTemplate,
+        cv: editableCvContent,
+        coverLetter: editableCoverLetterContent,
+      })
+    );
+    const link = `${window.location.origin}${window.location.pathname}#resume-share=${payload}`;
+    setShareResumeUrl(link);
+  };
+
+  const runDesignAssistant = () => {
+    const notes: string[] = [];
+    if (selectedTemplate === "modern" && !selectedProfilePhoto) {
+      notes.push("Modern looks stronger with a profile photo. Upload one and use Auto frame face.");
+    }
+    if (selectedTemplate === "classic" && selectedHeadingFont !== "Playfair Display") {
+      notes.push("Classic reads best with a serif heading. Playfair Display is the strongest current fit.");
+    }
+    if (selectedTemplate === "creative" && sidebarWidth < 26) {
+      notes.push("Creative benefits from a wider sidebar. Try a sidebar width around 28% to 32%.");
+    }
+    if (fontScale > 112) {
+      notes.push("Font scale is getting large for a one-page resume. Consider bringing it closer to 100%.");
+    }
+    if (lineHeightScale < 1.45) {
+      notes.push("Line height is a bit tight. Raise it slightly for better scanability.");
+    }
+    if (!notes.length) {
+      notes.push("The current design is balanced. Next improvement: save this as a named preset and create a role-specific variant.");
+    }
+    setDesignAssistantNotes(notes);
+  };
+
+  const createCvFromSelectedDesign = () => {
+    setEditableCvContent(createStarterCv(selectedTemplate));
+    setEditableCoverLetterContent(createStarterCoverLetter(selectedTemplate));
     setActiveDocTab("cv");
     setDocPreviewMode(true);
     setLeftPaneHidden(true);
   };
 
   const renderDocumentPreview = (content: string) => {
-    const sectionNames = new Set([
-      "Professional Summary",
-      "Core Skills",
-      "Professional Experience",
-      "Education",
-      "Role Alignment",
-    ]);
+    const { header, meta, sections } = parseDocumentSections(content);
+    const orderedSections = Array.from(sections.entries()).filter(([name]) => name !== "intro");
+    const visibleSections = selectedSections
+      .map((name) => orderedSections.find(([sectionName]) => sectionName === name))
+      .filter((entry): entry is [string, string[]] => Boolean(entry));
+    const introLines = sections.get("intro") ?? [];
+    const isCoverLetter = activeDocTab === "coverletter";
+    const profilePhotoStyle = {
+      objectFit: "cover" as const,
+      objectPosition: `${photoX}% ${photoY}%`,
+      transform: `scale(${photoZoom})`,
+      filter: `brightness(${photoBrightness}%) contrast(${photoContrast}%)`,
+      borderRadius: `${photoRoundness}%`,
+    };
+
+    if (isCoverLetter) {
+      return (
+        <div className={`a4-cv-preview a4-cover-preview cover-${selectedTemplate}`}>
+          <header className="preview-header">
+            <h1>{header}</h1>
+            <p className="preview-meta">{meta}</p>
+          </header>
+          <div className="cover-body">
+            {introLines.map((line, index) => (
+              line.startsWith("Dear ") || line === "Sincerely," || line === "Your Name" ? (
+                <p key={`${line}-${index}`} className="cover-salutation">{line}</p>
+              ) : (
+                <p key={`${line}-${index}`}>{line}</p>
+              )
+            ))}
+            {visibleSections.map(([section, values]) => (
+              <section key={section} className="preview-section">
+                <h2>{section}</h2>
+                {values.map((line, index) => (
+                  <p key={`${section}-${index}`}>{line.replace(/^-\s*/, "")}</p>
+                ))}
+              </section>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (selectedTemplate === "modern") {
+      const contact = sections.get("Contact") ?? [];
+      const skills = sections.get("Core Skills") ?? [];
+      const languages = sections.get("Languages") ?? [];
+      const roleTitle = meta;
+      const initials = header
+        .split(" ")
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase() ?? "")
+        .join("");
+
+      return (
+        <div className="a4-cv-preview modern-thumbnail-layout">
+          <aside className="modern-sidebar">
+            {selectedProfilePhoto ? (
+              <div className="modern-avatar photo-avatar">
+                <img src={selectedProfilePhoto} alt="Profile portrait" style={profilePhotoStyle} />
+              </div>
+            ) : (
+              <div className="modern-avatar" aria-hidden="true">{initials || "YN"}</div>
+            )}
+            <h1>{header}</h1>
+            <p className="modern-role">{roleTitle}</p>
+
+            {selectedSections.includes("Contact") && (
+            <section className="preview-section">
+              <h2>Contact</h2>
+              {contact.map((line, index) => (
+                <div key={`contact-${index}`} className="contact-row">
+                  <span className="contact-icon"><ResumeIcon name={index === 0 ? "phone" : index === 1 ? "link" : "map"} /></span>
+                  <p className="modern-sidebar-text">{line}</p>
+                </div>
+              ))}
+            </section>
+            )}
+
+            {selectedSections.includes("Core Skills") && (
+            <section className="preview-section">
+              <h2>Skills</h2>
+              <ul className="modern-list">
+                {skills.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </section>
+            )}
+
+            {selectedSections.includes("Languages") && (
+            <section className="preview-section">
+              <h2>Languages</h2>
+              {languages.map((line, index) => (
+                <p key={`language-${index}`} className="modern-sidebar-text">{line}</p>
+              ))}
+            </section>
+            )}
+          </aside>
+
+          <div className="modern-main">
+            {visibleSections
+              .filter(([section]) => !["Contact", "Core Skills", "Languages"].includes(section))
+              .map(([section, values]) => (
+                <section key={section} className="preview-section">
+                  <h2>{section}</h2>
+                  {values.map((line, index) => (
+                    line.startsWith("-") ? (
+                      <p key={`${section}-${index}`} className="preview-bullet">{line.replace(/^-\s*/, "")}</p>
+                    ) : (
+                      <p key={`${section}-${index}`} className={/MM\/YYYY|\|/.test(line) ? "preview-meta" : ""}>{line}</p>
+                    )
+                  ))}
+                </section>
+              ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (selectedTemplate === "creative") {
+      const skills = (sections.get("Core Skills") ?? []).join(" | ").split("|").map((skill) => skill.trim()).filter(Boolean);
+      return (
+        <div className="a4-cv-preview creative-preview-layout">
+          <aside className="creative-sidebar">
+            {selectedProfilePhoto && (
+              <div className="creative-photo-frame">
+                <img src={selectedProfilePhoto} alt="Profile portrait" style={profilePhotoStyle} />
+              </div>
+            )}
+            <h1>{header}</h1>
+            <p className="preview-meta">{meta}</p>
+            {selectedSections.includes("Core Skills") && (
+            <section className="preview-section">
+              <h2>Core Skills</h2>
+              <ul className="preview-pill-list">
+                {skills.map((skill) => (
+                  <li key={skill}>{skill}</li>
+                ))}
+              </ul>
+            </section>
+            )}
+          </aside>
+          <div className="creative-main">
+            {visibleSections
+              .filter(([section]) => section !== "Core Skills")
+              .map(([section, values]) => (
+                <section key={section} className="preview-section">
+                  <h2>{section}</h2>
+                  {values.map((line, index) => (
+                    line.startsWith("-") ? (
+                      <p key={`${section}-${index}`} className="preview-bullet">{line.replace(/^-\s*/, "")}</p>
+                    ) : (
+                      <p key={`${section}-${index}`} className={/MM\/YYYY|\|/.test(line) ? "preview-meta" : ""}>{line}</p>
+                    )
+                  ))}
+                </section>
+              ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (selectedTemplate === "classic") {
+      const summaryLines = sections.get("Professional Summary") ?? [];
+      const experience = sections.get("Professional Experience") ?? [];
+      const education = sections.get("Education") ?? [];
+      const skills = sections.get("Core Skills") ?? [];
+      const certifications = sections.get("Certifications") ?? [];
+      const languages = sections.get("Languages") ?? [];
+      const projects = sections.get("Projects") ?? [];
+      const contactLine = introLines[0] ?? "phone@email.com | LinkedIn | Location";
+
+      return (
+        <div className="a4-cv-preview classic-thumbnail-layout">
+          <header className="classic-hero">
+            <h1>{header}</h1>
+            <p className="classic-subtitle">{meta}</p>
+            <p className="classic-contact">{contactLine}</p>
+          </header>
+
+          <section className="classic-summary-band">
+            {summaryLines.map((line, index) => (
+              <p key={`summary-${index}`}>{line}</p>
+            ))}
+          </section>
+
+          <div className="classic-body">
+            <div className="classic-primary">
+              <section className="preview-section">
+                <h2>Work Experience</h2>
+                {experience.map((line, index) => (
+                  line.startsWith("-") ? (
+                    <p key={`experience-${index}`} className="preview-bullet">{line.replace(/^-\s*/, "")}</p>
+                  ) : (
+                    <p key={`experience-${index}`} className={/MM\/YYYY|\|/.test(line) ? "preview-meta" : "classic-emphasis"}>{line}</p>
+                  )
+                ))}
+              </section>
+
+              {selectedSections.includes("Projects") && projects.length > 0 && (
+                <section className="preview-section">
+                  <h2>Projects</h2>
+                  {projects.map((line, index) => (
+                    line.startsWith("-") ? (
+                      <p key={`project-${index}`} className="preview-bullet">{line.replace(/^-\s*/, "")}</p>
+                    ) : (
+                      <p key={`project-${index}`} className={index === 0 ? "classic-emphasis" : ""}>{line}</p>
+                    )
+                  ))}
+                </section>
+              )}
+
+              {selectedSections.includes("Education") && (
+              <section className="preview-section">
+                <h2>Education</h2>
+                {education.map((line, index) => (
+                  <p key={`education-${index}`} className={index === 0 ? "classic-emphasis" : ""}>{line}</p>
+                ))}
+              </section>
+              )}
+            </div>
+
+            <aside className="classic-secondary">
+              {selectedSections.includes("Core Skills") && (
+              <section className="preview-section">
+                <h2>Key Skills</h2>
+                {skills.map((line, index) => (
+                  <p key={`skill-${index}`}>{line}</p>
+                ))}
+              </section>
+              )}
+
+              {selectedSections.includes("Certifications") && (
+              <section className="preview-section">
+                <h2>Certifications</h2>
+                {certifications.map((line, index) => (
+                  <p key={`cert-${index}`}>{line}</p>
+                ))}
+              </section>
+              )}
+
+              {selectedSections.includes("Languages") && (
+              <section className="preview-section">
+                <h2>Languages</h2>
+                {languages.map((line, index) => (
+                  <p key={`lang-${index}`}>{line}</p>
+                ))}
+              </section>
+              )}
+            </aside>
+          </div>
+        </div>
+      );
+    }
 
     return (
-      <div className="a4-cv-preview">
-        {content.split("\n").map((rawLine, index) => {
-          const line = rawLine.trim();
-          if (!line) return <div key={index} className="preview-spacer" />;
-          if (index === 0) return <h1 key={index}>{line}</h1>;
-          if (sectionNames.has(line)) return <h2 key={index}>{line}</h2>;
-          if (line.startsWith("-")) return <p key={index} className="preview-bullet">{line.replace(/^-\s*/, "")}</p>;
-          if (/MM\/YYYY|@|LinkedIn|\|/.test(line)) return <p key={index} className="preview-meta">{line}</p>;
-          return <p key={index}>{line}</p>;
-        })}
+      <div className="a4-cv-preview modern-preview-layout">
+        <header className="preview-header">
+          <h1>{header}</h1>
+          <p className="preview-meta">{meta}</p>
+        </header>
+        {visibleSections.map(([section, values]) => (
+          <section key={section} className="preview-section">
+            <h2>{section}</h2>
+            {values.map((line, index) => (
+              line.startsWith("-") ? (
+                <p key={`${section}-${index}`} className="preview-bullet">{line.replace(/^-\s*/, "")}</p>
+              ) : (
+                <p key={`${section}-${index}`} className={/MM\/YYYY|\|/.test(line) ? "preview-meta" : ""}>{line}</p>
+              )
+            ))}
+          </section>
+        ))}
       </div>
     );
   };
@@ -1307,14 +2210,14 @@ Key Requirements:
                 <div className="cv-designs-card" style={{ marginBottom: '1rem', padding: '1rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h4 style={{ margin: 0 }}>Select CV Template</h4>
-                    <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)} style={{ padding: '0.25rem 0.5rem', borderRadius: '4px' }}>
+                    <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value as TemplateStyle)} style={{ padding: '0.25rem 0.5rem', borderRadius: '4px' }}>
                       <option value="modern">Modernist</option>
                       <option value="classic">Classic Serif</option>
                       <option value="creative">Creative Outline</option>
                     </select>
                   </div>
                 </div>
-                <div className={`a4-cv-container template-${selectedTemplate}`} style={{ margin: 0 }}>
+                <div className={`a4-cv-container template-${selectedTemplate}`} style={{ margin: 0, ...cvFontStyle }}>
                   <textarea 
                     className="a4-cv-editor"
                     value={editableCvContent}
@@ -1342,7 +2245,7 @@ Key Requirements:
                      AI Auto-Tailor
                   </button>
                 </div>
-                <div className={`a4-cv-container template-${selectedTemplate}`} style={{ margin: 0 }}>
+                <div className={`a4-cv-container template-${selectedTemplate}`} style={{ margin: 0, ...cvFontStyle }}>
                   <textarea 
                     className="a4-cv-editor"
                     value={editableCoverLetterContent}
@@ -1649,7 +2552,7 @@ Key Requirements:
               {docPreviewMode ? "Edit" : "Preview"}
             </button>
           </div>
-          <div className={`a4-cv-container template-${selectedTemplate} ${docPreviewMode ? "preview-mode" : ""}`}>
+          <div className={`a4-cv-container template-${selectedTemplate} ${docPreviewMode ? "preview-mode" : ""}`} style={cvFontStyle}>
             {docPreviewMode ? (
               renderDocumentPreview(activeDocTab === 'cv' ? editableCvContent : editableCoverLetterContent)
             ) : activeDocTab === 'cv' ? (
@@ -1701,6 +2604,240 @@ Key Requirements:
         <button type="button" className="btn-primary create-cv-button" onClick={createCvFromSelectedDesign}>
           Create CV with {selectedTemplate.charAt(0).toUpperCase() + selectedTemplate.slice(1)}
         </button>
+
+        <div className="studio-tabs">
+          {(["fonts", "colors", "photo", "layout", "sections", "export"] as StudioTab[]).map((tabName) => (
+            <button
+              key={tabName}
+              type="button"
+              className={`studio-tab-btn ${studioTab === tabName ? "active" : ""}`}
+              onClick={() => setStudioTab(tabName)}
+            >
+              {tabName}
+            </button>
+          ))}
+        </div>
+
+        <div className="studio-control-card">
+          {studioTab === "fonts" && (
+            <>
+              <div className="font-control">
+                <label htmlFor="cvHeadingFontSelect">Heading font</label>
+                <select
+                  id="cvHeadingFontSelect"
+                  value={selectedHeadingFont}
+                  onChange={(e) => setSelectedHeadingFont(e.target.value as FontOptionValue)}
+                >
+                  {GOOGLE_FONT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="font-control">
+                <label htmlFor="cvBodyFontSelect">Body font</label>
+                <select
+                  id="cvBodyFontSelect"
+                  value={selectedBodyFont}
+                  onChange={(e) => setSelectedBodyFont(e.target.value as FontOptionValue)}
+                >
+                  {GOOGLE_FONT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="range-control">
+                <label>Font size scale <span>{fontScale}%</span></label>
+                <input type="range" min="90" max="120" value={fontScale} onChange={(e) => setFontScale(Number(e.target.value))} />
+              </div>
+              <div className="range-control">
+                <label>Line height <span>{lineHeightScale.toFixed(2)}</span></label>
+                <input type="range" min="1.3" max="2" step="0.05" value={lineHeightScale} onChange={(e) => setLineHeightScale(Number(e.target.value))} />
+              </div>
+            </>
+          )}
+
+          {studioTab === "colors" && (
+            <>
+              <div className="preset-grid">
+                {THEME_PRESETS.map((preset) => (
+                  <button key={preset.id} type="button" className="preset-chip" onClick={() => applyThemePreset(preset.id)}>
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+              <div className="font-control">
+                <label htmlFor="stylePresetName">Save style preset</label>
+                <input id="stylePresetName" value={stylePresetName} onChange={(e) => setStylePresetName(e.target.value)} placeholder="Executive Blue" />
+              </div>
+              <button type="button" className="btn-secondary studio-action" onClick={saveCurrentStylePreset}>Save current style</button>
+              {savedStylePresets.length > 0 && (
+                <div className="saved-preset-list">
+                  {savedStylePresets.map((preset) => (
+                    <button key={preset.id} type="button" className="saved-preset-row" onClick={() => applySavedStylePreset(preset)}>
+                      <span>{preset.name}</span>
+                      <span>{preset.headingFont} / {preset.bodyFont}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="color-grid">
+                <label><span>Text</span><input type="color" value={textColor} onChange={(e) => setTextColor(e.target.value)} /></label>
+                <label><span>Accent</span><input type="color" value={accentColor} onChange={(e) => setAccentColor(e.target.value)} /></label>
+                <label><span>Paper</span><input type="color" value={paperColor} onChange={(e) => setPaperColor(e.target.value)} /></label>
+                <label><span>Background</span><input type="color" value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} /></label>
+                <label><span>Sidebar</span><input type="color" value={sidebarColor} onChange={(e) => setSidebarColor(e.target.value)} /></label>
+              </div>
+            </>
+          )}
+
+          {studioTab === "photo" && (
+            <>
+              <label className="photo-upload-box">
+                <input type="file" accept="image/*" onChange={(e) => handleProfilePhotoUpload(e.target.files?.[0] ?? null)} />
+                <span className="photo-upload-icon"><ResumeIcon name="camera" /></span>
+                <strong>Upload profile photo</strong>
+                <span>Auto-center portrait, then adjust crop, light, and shape.</span>
+              </label>
+              {profilePhotoGallery.length > 0 && (
+                <div className="photo-gallery">
+                  {profilePhotoGallery.map((photo) => (
+                    <button
+                      key={photo}
+                      type="button"
+                      className={`photo-thumb ${selectedProfilePhoto === photo ? "active" : ""}`}
+                      onClick={() => setSelectedProfilePhoto(photo)}
+                    >
+                      <img src={photo} alt="Profile option" />
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button type="button" className="btn-secondary studio-action" onClick={autoFramePhoto}>Auto frame face</button>
+              <button type="button" className="btn-secondary studio-action" onClick={removeCurrentPhoto} disabled={!selectedProfilePhoto}>Remove selected photo</button>
+              <div className="range-control">
+                <label>Zoom <span>{photoZoom.toFixed(2)}x</span></label>
+                <input type="range" min="1" max="1.8" step="0.02" value={photoZoom} onChange={(e) => setPhotoZoom(Number(e.target.value))} />
+              </div>
+              <div className="range-control">
+                <label>Brightness <span>{photoBrightness}%</span></label>
+                <input type="range" min="80" max="130" value={photoBrightness} onChange={(e) => setPhotoBrightness(Number(e.target.value))} />
+              </div>
+              <div className="range-control">
+                <label>Contrast <span>{photoContrast}%</span></label>
+                <input type="range" min="80" max="140" value={photoContrast} onChange={(e) => setPhotoContrast(Number(e.target.value))} />
+              </div>
+              <div className="range-control">
+                <label>Horizontal crop <span>{photoX}%</span></label>
+                <input type="range" min="0" max="100" value={photoX} onChange={(e) => setPhotoX(Number(e.target.value))} />
+              </div>
+              <div className="range-control">
+                <label>Vertical crop <span>{photoY}%</span></label>
+                <input type="range" min="0" max="100" value={photoY} onChange={(e) => setPhotoY(Number(e.target.value))} />
+              </div>
+              <div className="range-control">
+                <label>Roundness <span>{photoRoundness}%</span></label>
+                <input type="range" min="0" max="50" value={photoRoundness} onChange={(e) => setPhotoRoundness(Number(e.target.value))} />
+              </div>
+            </>
+          )}
+
+          {studioTab === "layout" && (
+            <>
+              <div className="range-control">
+                <label>Sidebar width <span>{sidebarWidth}%</span></label>
+                <input type="range" min="20" max="45" value={sidebarWidth} onChange={(e) => setSidebarWidth(Number(e.target.value))} />
+              </div>
+              <div className="range-control">
+                <label>Section density <span>{sectionDensity}%</span></label>
+                <input type="range" min="80" max="130" value={sectionDensity} onChange={(e) => setSectionDensity(Number(e.target.value))} />
+              </div>
+              <div className="font-control">
+                <label htmlFor="dividerStyle">Divider style</label>
+                <select id="dividerStyle" value={dividerStyle} onChange={(e) => setDividerStyle(e.target.value as "solid" | "dashed" | "none")}>
+                  <option value="solid">Solid</option>
+                  <option value="dashed">Dashed</option>
+                  <option value="none">None</option>
+                </select>
+              </div>
+            </>
+          )}
+
+          {studioTab === "sections" && (
+            <>
+              <div className="font-control">
+                <label htmlFor="customSectionName">Add custom section</label>
+                <input id="customSectionName" value={customSectionName} onChange={(e) => setCustomSectionName(e.target.value)} placeholder="Awards" />
+              </div>
+              <button type="button" className="btn-secondary studio-action" onClick={addCustomSection}>Add custom section</button>
+              <div className="section-toggle-grid">
+                {selectedSections.map((sectionName, index) => (
+                  <div key={sectionName} className="section-row">
+                    <label className="section-toggle">
+                      <input type="checkbox" checked={selectedSections.includes(sectionName)} onChange={() => toggleSectionVisibility(sectionName)} />
+                      <span>{sectionName}</span>
+                    </label>
+                    <div className="section-actions">
+                      <button type="button" onClick={() => moveSection(sectionName, -1)} disabled={index === 0}>Up</button>
+                      <button type="button" onClick={() => moveSection(sectionName, 1)} disabled={index === selectedSections.length - 1}>Down</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {studioTab === "export" && (
+            <div className="export-actions">
+              <button type="button" className="btn-secondary studio-action" onClick={() => setDocPreviewMode(true)}>Preview print layout</button>
+              <button type="button" className="btn-secondary studio-action" onClick={runDesignAssistant}>Improve design</button>
+              <button type="button" className="btn-secondary studio-action" onClick={() => window.print()}>Export PDF</button>
+              <button type="button" className="btn-secondary studio-action" onClick={() => alert("DOCX export will preserve the selected design tokens.")}>Export DOCX</button>
+              <div className="font-control">
+                <label htmlFor="variantName">Save resume variant</label>
+                <input id="variantName" value={variantName} onChange={(e) => setVariantName(e.target.value)} placeholder="Senior BA - ATS safe" />
+              </div>
+              <button type="button" className="btn-secondary studio-action" onClick={saveResumeVariant}>Save variant</button>
+              {resumeVariants.length > 0 && (
+                <div className="saved-preset-list">
+                  {resumeVariants.map((variant) => (
+                    <div key={variant.id} className="saved-preset-row variant-row">
+                      <button type="button" className="variant-main" onClick={() => loadResumeVariant(variant)}>
+                        <span>{variant.name}</span>
+                        <span>{variant.template}</span>
+                      </button>
+                      <div className="variant-actions">
+                        <button type="button" onClick={() => duplicateResumeVariant(variant)}>Copy</button>
+                        <button type="button" onClick={() => renameResumeVariant(variant.id)}>Rename</button>
+                        <button type="button" onClick={() => deleteResumeVariant(variant.id)}>Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button type="button" className="btn-secondary studio-action" onClick={createShareLink}>Create share link</button>
+              {shareResumeUrl && <textarea readOnly className="share-link-box" value={shareResumeUrl} />}
+              {designAssistantNotes.length > 0 && (
+                <div className="design-assistant-notes">
+                  {designAssistantNotes.map((note) => (
+                    <p key={note}>{note}</p>
+                  ))}
+                </div>
+              )}
+              {atsDesignWarnings.length > 0 && (
+                <div className="ats-warning-box">
+                  <strong>ATS-safe design warnings</strong>
+                  {atsDesignWarnings.map((warning) => (
+                    <p key={warning}>{warning}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         <div className="apply-template-control">
           <input 

@@ -90,6 +90,30 @@ const featureReadinessRows = [
   ...platformBuildoutRows,
 ];
 
+const reactiveResumeLearningRows = [
+  ["CV template switching", "Strong (Modern, Classic, Creative with live design studio controls)", "90%", "Add 5-10 more production-grade templates and saved design packs."],
+  ["Thumbnail-accurate layouts", "Strong (Modern and Classic closely aligned, Creative enhanced)", "85%", "Finish exact visual parity for every thumbnail and every export mode."],
+  ["Font switching", "Complete (heading font, body font, size scale, line height, and saved style presets)", "100%", "Add locked enterprise typography kits when branding mode is introduced."],
+  ["Text color control", "Complete (live text color picker across templates)", "100%", "Add contrast safety guidance for ATS-safe themes."],
+  ["Accent color control", "Complete (live accent color for headings, dividers, bullets, and chips)", "100%", "Add locked palette presets for enterprise brand kits."],
+  ["Background color control", "Complete (paper, background, and sidebar color controls)", "100%", "Add gradient and texture-safe preset options."],
+  ["Profile photo upload", "Complete (upload, persistent gallery, selection, and removal controls)", "100%", "Upgrade gallery into multi-device cloud sync when backend media storage is ready."],
+  ["Photo editing", "Strong (brightness, contrast, zoom, crop, roundness, auto-frame)", "95%", "Upgrade auto-frame into real face detection and smart portrait crop."],
+  ["Icons in CV", "Strong (shared resume icon layer for contact and studio metadata)", "90%", "Adopt a full external icon library if we want broader template iconography."],
+  ["Structured resume data", "Partial (parsed CV plus section-aware rendering, still text-backed)", "55%", "Move to fully structured blocks for jobs, projects, education, and contact fields."],
+  ["Section management", "Complete (show/hide controls, custom sections, and reorder controls)", "100%", "Add drag-and-drop ordering and richer custom section schemas."],
+  ["Layout controls", "Complete (sidebar width, density, divider style, and spacing-oriented controls)", "100%", "Add column balance and section-specific spacing rules."],
+  ["Color themes / presets", "Complete (preset themes plus saved reusable style presets)", "100%", "Add per-template theme locks for managed enterprise branding."],
+  ["Export fidelity", "Partial (print-to-PDF flow, DOCX action scaffold, preview-first rendering)", "60%", "Make PDF/DOCX output match preview 1:1."],
+  ["Reusable design tokens", "Strong (fonts, colors, spacing, sidebar width, density, and divider style tokenized)", "90%", "Move remaining hardcoded template values into reusable token maps."],
+  ["Resume gallery / variants", "Complete (multiple saved local resume variants with load, copy, rename, and delete)", "100%", "Add cloud sync and cross-device persistence."],
+  ["Share / publish", "Partial (generated recruiter-safe share links and export actions)", "55%", "Back links with hosted public/private resume routes instead of local URL payloads."],
+  ["AI design assistant", "Partial (heuristic improve-design guidance inside studio)", "60%", "Add model-backed template and readability recommendations."],
+  ["ATS-safe design warnings", "Complete (live warnings for photos, creative layouts, font scale, and space use)", "100%", "Add proper contrast scoring and exporter-aware ATS risk checks."],
+  ["Template customization UX", "Complete (Fonts, Colors, Photo, Layout, Sections, Export tabs with saved presets and variants)", "100%", "Add undo/redo as a polish layer rather than a missing core capability."],
+  ["Icon library integration", "Strong (shared internal icon layer across designer and preview)", "80%", "Adopt a broader icon pack if we need expanded visual language."],
+];
+
 function authHeaders(): HeadersInit {
   const token = localStorage.getItem("auth_token") ?? "";
   const tenantId = localStorage.getItem("tenant_id") ?? "";
@@ -517,6 +541,40 @@ export default function App() {
                     </thead>
                     <tbody>
                       {featureReadinessRows.map((row) => (
+                        <tr key={row[0]}>
+                          <td style={{ fontWeight: '600', color: '#1e293b' }}>{row[0]}</td>
+                          <td style={{ fontSize: '0.9rem', color: '#475569' }}>{row[1]}</td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '120px' }}>
+                              <div style={{ background: '#e2e8f0', borderRadius: '4px', flexGrow: 1, height: '8px', overflow: 'hidden' }}>
+                                <div style={{ background: parseInt(row[2]) >= 80 ? '#10b981' : parseInt(row[2]) >= 50 ? '#f59e0b' : '#ef4444', width: row[2], height: '100%' }} />
+                              </div>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 'bold', minWidth: '40px' }}>{row[2]}</span>
+                            </div>
+                          </td>
+                          <td style={{ fontSize: '0.9rem', color: '#64748b', fontStyle: 'italic' }}>{row[3]}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+
+                <section className="card full">
+                  <h3>Reactive Resume Learnings</h3>
+                  <p className="subtitle" style={{ marginBottom: '1rem' }}>
+                    Reference: <a href="https://github.com/amruthpillai/reactive-resume" target="_blank" rel="noreferrer">amruthpillai/reactive-resume</a>
+                  </p>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Feature / Function</th>
+                        <th>What CareerOS Has</th>
+                        <th>Readiness</th>
+                        <th>Suggestion</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reactiveResumeLearningRows.map((row) => (
                         <tr key={row[0]}>
                           <td style={{ fontWeight: '600', color: '#1e293b' }}>{row[0]}</td>
                           <td style={{ fontSize: '0.9rem', color: '#475569' }}>{row[1]}</td>
