@@ -6,6 +6,7 @@ import { automationController } from "../controllers/AutomationController";
 
 
 const API = import.meta.env.VITE_API_BASE ?? "http://localhost:8000/api/v1";
+const RESUME_STUDIO_API = `${API}/resume-studio`;
 
 interface Preference {
   id: number;
@@ -68,6 +69,22 @@ type ResumeVariant = {
   coverLetter: string;
   photo: string | null;
   sections: string[];
+};
+
+type StructuredResumeData = {
+  name: string;
+  title: string;
+  contact: string[];
+  summary: string[];
+  skills: string[];
+  experience: string[];
+  projects: string[];
+  education: string[];
+  certifications: string[];
+  languages: string[];
+  roleAlignment: string[];
+  signatureWins: string[];
+  customSections: Array<{ name: string; lines: string[] }>;
 };
 
 interface ScoredJob extends JobResult {
@@ -195,6 +212,10 @@ function authHeaders(): HeadersInit {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(tenantId ? { "X-Tenant-Id": tenantId } : {}),
   };
+}
+
+function hasApiSession() {
+  return Boolean(localStorage.getItem("auth_token"));
 }
 
 function getMockDiffData(): DiffData {
@@ -498,6 +519,98 @@ function parseDocumentSections(content: string) {
   return { header, meta, sections };
 }
 
+function parseStructuredResume(content: string): StructuredResumeData {
+  const { header, meta, sections } = parseDocumentSections(content);
+  const knownSections = new Set([
+    "Contact",
+    "Professional Summary",
+    "Core Skills",
+    "Professional Experience",
+    "Projects",
+    "Education",
+    "Certifications",
+    "Languages",
+    "Role Alignment",
+    "Signature Wins",
+  ]);
+
+  return {
+    name: header,
+    title: meta,
+    contact: sections.get("Contact") ?? [],
+    summary: sections.get("Professional Summary") ?? [],
+    skills: (sections.get("Core Skills") ?? []).flatMap((line) => line.split("|").map((item) => item.trim()).filter(Boolean)),
+    experience: sections.get("Professional Experience") ?? [],
+    projects: sections.get("Projects") ?? [],
+    education: sections.get("Education") ?? [],
+    certifications: sections.get("Certifications") ?? [],
+    languages: sections.get("Languages") ?? [],
+    roleAlignment: sections.get("Role Alignment") ?? [],
+    signatureWins: sections.get("Signature Wins") ?? [],
+    customSections: Array.from(sections.entries())
+      .filter(([name]) => !knownSections.has(name) && name !== "intro")
+      .map(([name, lines]) => ({ name, lines })),
+  };
+}
+
+function buildResumeFromStructured(data: StructuredResumeData): string {
+  const blocks: string[] = [data.name || "Your Name", data.title || "Target Role Title"];
+
+  const appendSection = (name: string, lines: string[]) => {
+    const cleaned = lines.map((line) => line.trim()).filter(Boolean);
+    if (!cleaned.length) return;
+    blocks.push("", name, ...cleaned);
+  };
+
+  appendSection("Contact", data.contact);
+  appendSection("Core Skills", data.skills);
+  appendSection("Languages", data.languages);
+  appendSection("Professional Summary", data.summary);
+  appendSection("Professional Experience", data.experience);
+  appendSection("Projects", data.projects);
+  appendSection("Education", data.education);
+  appendSection("Certifications", data.certifications);
+  appendSection("Role Alignment", data.roleAlignment);
+  appendSection("Signature Wins", data.signatureWins);
+
+  for (const section of data.customSections) {
+    appendSection(section.name, section.lines);
+  }
+
+  return blocks.join("\n");
+}
+
+function getContrastRatio(hexA: string, hexB: string) {
+  const toRgb = (hex: string) => {
+    const sanitized = hex.replace("#", "");
+    const normalized = sanitized.length === 3
+      ? sanitized.split("").map((char) => char + char).join("")
+      : sanitized;
+    const value = Number.parseInt(normalized, 16);
+    return {
+      r: (value >> 16) & 255,
+      g: (value >> 8) & 255,
+      b: value & 255,
+    };
+  };
+
+  const toLinear = (channel: number) => {
+    const value = channel / 255;
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  };
+
+  const luminance = (hex: string) => {
+    const { r, g, b } = toRgb(hex);
+    return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+  };
+
+  const l1 = luminance(hexA);
+  const l2 = luminance(hexB);
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+  return Number(((lighter + 0.05) / (darker + 0.05)).toFixed(2));
+}
+
 function inferExperienceLevel(text: string): ExperienceLevel {
   const lower = text.toLowerCase();
   const yearsMatch = lower.match(/(\d+)\+?\s+years?/);
@@ -689,6 +802,7 @@ export default function JobDiscovery() {
   const [customSectionName, setCustomSectionName] = useState("");
   const [shareResumeUrl, setShareResumeUrl] = useState("");
   const [designAssistantNotes, setDesignAssistantNotes] = useState<string[]>([]);
+  const [structuredResumeDraft, setStructuredResumeDraft] = useState<StructuredResumeData>(() => parseStructuredResume(createStarterCv("modern")));
   const [applyTemplateCheckbox, setApplyTemplateCheckbox] = useState(false);
   const [editableCoverLetterContent, setEditableCoverLetterContent] = useState("");
   const [activeDocTab, setActiveDocTab] = useState<'cv' | 'coverletter'>('cv');
@@ -804,6 +918,37 @@ export default function JobDiscovery() {
   }, []);
 
   useEffect(() => {
+    if (!hasApiSession()) return;
+
+    const loadStudio = async () => {
+      try {
+        const [profileResponse, variantsResponse] = await Promise.all([
+          fetch(`${RESUME_STUDIO_API}/profile`, { headers: authHeaders() }),
+          fetch(`${RESUME_STUDIO_API}/variants`, { headers: authHeaders() }),
+        ]);
+
+        if (profileResponse.ok) {
+          const profileBody = await profileResponse.json();
+          if (profileBody?.data) {
+            applyStudioProfileData(profileBody.data as Record<string, unknown>);
+          }
+        }
+
+        if (variantsResponse.ok) {
+          const variantsBody = await variantsResponse.json();
+          if (Array.isArray(variantsBody?.data)) {
+            setResumeVariants(variantsBody.data as ResumeVariant[]);
+          }
+        }
+      } catch {
+        // keep local fallback silently
+      }
+    };
+
+    void loadStudio();
+  }, []);
+
+  useEffect(() => {
     localStorage.setItem(
       studioStorageKey,
       JSON.stringify({
@@ -861,6 +1006,94 @@ export default function JobDiscovery() {
   useEffect(() => {
     localStorage.setItem(variantStorageKey, JSON.stringify(resumeVariants));
   }, [resumeVariants]);
+
+  useEffect(() => {
+    if (!hasApiSession()) return;
+    if (!editableCvContent.trim()) return;
+
+    const timeout = window.setTimeout(() => {
+      void fetch(`${RESUME_STUDIO_API}/profile`, {
+        method: "PUT",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          name: structuredResumeDraft.name,
+          target_title: structuredResumeDraft.title,
+          template_style: selectedTemplate,
+          structured_resume_json: buildStructuredResumePayload(),
+          design_tokens_json: buildDesignTokensPayload(),
+          selected_sections_json: selectedSections,
+          cv_text: editableCvContent,
+          cover_letter_text: editableCoverLetterContent,
+          profile_photo_data: selectedProfilePhoto,
+        }),
+      }).catch(() => {
+        // keep local draft if backend unavailable
+      });
+    }, 900);
+
+    return () => window.clearTimeout(timeout);
+  }, [
+    editableCvContent,
+    editableCoverLetterContent,
+    selectedTemplate,
+    structuredResumeDraft,
+    selectedHeadingFont,
+    selectedBodyFont,
+    textColor,
+    accentColor,
+    paperColor,
+    backgroundColor,
+    sidebarColor,
+    lineHeightScale,
+    fontScale,
+    sidebarWidth,
+    sectionDensity,
+    dividerStyle,
+  ]);
+
+  useEffect(() => {
+    if (activeDocTab !== "cv") return;
+    setStructuredResumeDraft(parseStructuredResume(editableCvContent || createStarterCv(selectedTemplate)));
+  }, [editableCvContent, activeDocTab, selectedTemplate]);
+
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash.startsWith("#resume-share=")) return;
+
+    try {
+      const encoded = hash.replace("#resume-share=", "");
+      const parsed = JSON.parse(decodeURIComponent(encoded)) as Record<string, unknown>;
+      if (typeof parsed.template === "string") {
+        setSelectedTemplate(parsed.template as TemplateStyle);
+      }
+      if (typeof parsed.cv === "string") {
+        setEditableCvContent(parsed.cv);
+      }
+      if (typeof parsed.coverLetter === "string") {
+        setEditableCoverLetterContent(parsed.coverLetter);
+      }
+      if (typeof parsed.headingFont === "string") setSelectedHeadingFont(parsed.headingFont as FontOptionValue);
+      if (typeof parsed.bodyFont === "string") setSelectedBodyFont(parsed.bodyFont as FontOptionValue);
+      if (typeof parsed.textColor === "string") setTextColor(parsed.textColor);
+      if (typeof parsed.accentColor === "string") setAccentColor(parsed.accentColor);
+      if (typeof parsed.paperColor === "string") setPaperColor(parsed.paperColor);
+      if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
+      if (typeof parsed.sidebarColor === "string") setSidebarColor(parsed.sidebarColor);
+      if (typeof parsed.lineHeightScale === "number") setLineHeightScale(parsed.lineHeightScale);
+      if (typeof parsed.fontScale === "number") setFontScale(parsed.fontScale);
+      if (typeof parsed.sidebarWidth === "number") setSidebarWidth(parsed.sidebarWidth);
+      if (typeof parsed.sectionDensity === "number") setSectionDensity(parsed.sectionDensity);
+      if (typeof parsed.dividerStyle === "string") setDividerStyle(parsed.dividerStyle as "solid" | "dashed" | "none");
+      if (typeof parsed.photo === "string") setSelectedProfilePhoto(parsed.photo);
+      if (Array.isArray(parsed.sections)) {
+        setSelectedSections(parsed.sections.filter((item): item is string => typeof item === "string"));
+      }
+      setDocPreviewMode(true);
+      setLeftPaneHidden(true);
+    } catch {
+      // ignore malformed share payload
+    }
+  }, []);
 
 
   const loadPreferences = async () => {
@@ -1397,6 +1630,83 @@ Key Requirements:
     ["--cv-divider-style" as string]: dividerStyle,
   };
 
+  const buildDesignTokensPayload = () => ({
+    selectedHeadingFont,
+    selectedBodyFont,
+    textColor,
+    accentColor,
+    paperColor,
+    backgroundColor,
+    sidebarColor,
+    lineHeightScale,
+    fontScale,
+    sidebarWidth,
+    sectionDensity,
+    dividerStyle,
+  });
+
+  const buildStructuredResumePayload = () => ({
+    ...structuredResumeDraft,
+    customSections: structuredResumeDraft.customSections ?? [],
+  });
+
+  const buildExportCss = () => `
+    body { margin: 0; background: ${backgroundColor}; }
+    .a4-cv-preview {
+      color: ${textColor};
+      background: ${paperColor};
+      font-family: '${selectedBodyFont}', sans-serif;
+      line-height: ${lineHeightScale};
+    }
+    .a4-cv-preview h1, .a4-cv-preview h2, .a4-cv-preview h3 {
+      font-family: '${selectedHeadingFont}', sans-serif;
+      color: ${accentColor};
+    }
+    .a4-cv-preview h2 {
+      border-bottom: 1px ${dividerStyle === "none" ? "solid" : dividerStyle} ${accentColor};
+      padding-bottom: 4px;
+    }
+    .modern-sidebar { background: ${sidebarColor}; }
+    .creative-sidebar { background: ${sidebarColor}; color: #ffffff; }
+    .classic-hero { background: ${paperColor}; color: ${textColor}; }
+    img { max-width: 100%; }
+  `;
+
+  const applyStudioProfileData = (profile: Record<string, unknown>) => {
+    if (typeof profile.name === "string" || typeof profile.target_title === "string") {
+      setStructuredResumeDraft((current) => ({
+        ...current,
+        name: typeof profile.name === "string" ? profile.name : current.name,
+        title: typeof profile.target_title === "string" ? profile.target_title : current.title,
+      }));
+    }
+    if (typeof profile.template_style === "string") setSelectedTemplate(profile.template_style as TemplateStyle);
+    if (typeof profile.cv_text === "string" && profile.cv_text) setEditableCvContent(profile.cv_text);
+    if (typeof profile.cover_letter_text === "string") setEditableCoverLetterContent(profile.cover_letter_text);
+    if (typeof profile.profile_photo_data === "string") setSelectedProfilePhoto(profile.profile_photo_data);
+    if (Array.isArray(profile.selected_sections_json)) {
+      setSelectedSections(profile.selected_sections_json.filter((item): item is string => typeof item === "string"));
+    }
+    if (profile.structured_resume_json && typeof profile.structured_resume_json === "object") {
+      setStructuredResumeDraft(profile.structured_resume_json as StructuredResumeData);
+    }
+    if (profile.design_tokens_json && typeof profile.design_tokens_json === "object") {
+      const tokens = profile.design_tokens_json as Record<string, unknown>;
+      if (typeof tokens.selectedHeadingFont === "string") setSelectedHeadingFont(tokens.selectedHeadingFont as FontOptionValue);
+      if (typeof tokens.selectedBodyFont === "string") setSelectedBodyFont(tokens.selectedBodyFont as FontOptionValue);
+      if (typeof tokens.textColor === "string") setTextColor(tokens.textColor);
+      if (typeof tokens.accentColor === "string") setAccentColor(tokens.accentColor);
+      if (typeof tokens.paperColor === "string") setPaperColor(tokens.paperColor);
+      if (typeof tokens.backgroundColor === "string") setBackgroundColor(tokens.backgroundColor);
+      if (typeof tokens.sidebarColor === "string") setSidebarColor(tokens.sidebarColor);
+      if (typeof tokens.lineHeightScale === "number") setLineHeightScale(tokens.lineHeightScale);
+      if (typeof tokens.fontScale === "number") setFontScale(tokens.fontScale);
+      if (typeof tokens.sidebarWidth === "number") setSidebarWidth(tokens.sidebarWidth);
+      if (typeof tokens.sectionDensity === "number") setSectionDensity(tokens.sectionDensity);
+      if (typeof tokens.dividerStyle === "string") setDividerStyle(tokens.dividerStyle as "solid" | "dashed" | "none");
+    }
+  };
+
   const toggleSectionVisibility = (sectionName: string) => {
     setSelectedSections((current) =>
       current.includes(sectionName)
@@ -1465,14 +1775,16 @@ Key Requirements:
 
   const atsDesignWarnings = useMemo(() => {
     const warnings: string[] = [];
-    const isVeryLightText = textColor.toLowerCase() === "#ffffff" || textColor.toLowerCase() === "#f8fafc";
-    if (isVeryLightText) warnings.push("Light text may reduce readability in ATS exports.");
+    const textContrast = getContrastRatio(textColor, paperColor);
+    const accentContrast = getContrastRatio(accentColor, paperColor);
+    if (textContrast < 4.5) warnings.push(`Body text contrast is ${textContrast}:1. Aim for at least 4.5:1 for reliable readability.`);
+    if (accentContrast < 3) warnings.push(`Accent contrast is ${accentContrast}:1. Heading lines and chips may wash out in export.`);
     if (selectedProfilePhoto) warnings.push("Profile photos can be useful visually, but keep a photo-free variant for strict ATS submissions.");
     if (selectedTemplate === "creative") warnings.push("Creative layouts can score lower on conservative ATS pipelines. Use Modern or Classic for safer submissions.");
     if (fontScale > 112) warnings.push("Large font scale may push content beyond one page.");
     if (sidebarWidth > 38 && selectedTemplate !== "classic") warnings.push("A wide sidebar reduces content space for experience and projects.");
     return warnings;
-  }, [textColor, selectedProfilePhoto, selectedTemplate, fontScale, sidebarWidth]);
+  }, [textColor, paperColor, accentColor, selectedProfilePhoto, selectedTemplate, fontScale, sidebarWidth]);
 
   const removeCurrentPhoto = () => {
     if (!selectedProfilePhoto) return;
@@ -1518,7 +1830,7 @@ Key Requirements:
     setSectionDensity(preset.sectionDensity);
   };
 
-  const saveResumeVariant = () => {
+  const saveResumeVariant = async () => {
     const trimmedName = variantName.trim() || `${TEMPLATE_LABELS[selectedTemplate]} variant`;
     const variant: ResumeVariant = {
       id: `variant-${Date.now()}`,
@@ -1529,7 +1841,48 @@ Key Requirements:
       photo: selectedProfilePhoto,
       sections: selectedSections,
     };
-    setResumeVariants((current) => [variant, ...current.filter((item) => item.name !== variant.name)].slice(0, 10));
+
+    if (hasApiSession()) {
+      try {
+        const response = await fetch(`${RESUME_STUDIO_API}/variants`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            name: trimmedName,
+            template_style: selectedTemplate,
+            structured_resume_json: buildStructuredResumePayload(),
+            design_tokens_json: buildDesignTokensPayload(),
+            selected_sections_json: selectedSections,
+            cv_text: editableCvContent,
+            cover_letter_text: editableCoverLetterContent,
+            profile_photo_data: selectedProfilePhoto,
+          }),
+        });
+
+        if (response.ok) {
+          const body = await response.json();
+          const serverVariant = body.data;
+          setResumeVariants((current) => [
+            {
+              id: String(serverVariant.id),
+              name: serverVariant.name,
+              template: serverVariant.template_style,
+              cv: serverVariant.cv_text ?? "",
+              coverLetter: serverVariant.cover_letter_text ?? "",
+              photo: serverVariant.profile_photo_data ?? null,
+              sections: serverVariant.selected_sections_json ?? [],
+            },
+            ...current.filter((item) => item.name !== trimmedName),
+          ].slice(0, 10));
+        } else {
+          setResumeVariants((current) => [variant, ...current.filter((item) => item.name !== variant.name)].slice(0, 10));
+        }
+      } catch {
+        setResumeVariants((current) => [variant, ...current.filter((item) => item.name !== variant.name)].slice(0, 10));
+      }
+    } else {
+      setResumeVariants((current) => [variant, ...current.filter((item) => item.name !== variant.name)].slice(0, 10));
+    }
     setVariantName("");
   };
 
@@ -1544,15 +1897,36 @@ Key Requirements:
     ].slice(0, 10));
   };
 
-  const renameResumeVariant = (variantId: string) => {
+  const renameResumeVariant = async (variantId: string) => {
     const nextName = window.prompt("Rename resume variant");
     if (!nextName?.trim()) return;
+    if (hasApiSession() && /^\d+$/.test(variantId)) {
+      try {
+        await fetch(`${RESUME_STUDIO_API}/variants/${variantId}`, {
+          method: "PUT",
+          headers: authHeaders(),
+          body: JSON.stringify({ name: nextName.trim() }),
+        });
+      } catch {
+        // local fallback continues below
+      }
+    }
     setResumeVariants((current) =>
       current.map((variant) => variant.id === variantId ? { ...variant, name: nextName.trim() } : variant)
     );
   };
 
-  const deleteResumeVariant = (variantId: string) => {
+  const deleteResumeVariant = async (variantId: string) => {
+    if (hasApiSession() && /^\d+$/.test(variantId)) {
+      try {
+        await fetch(`${RESUME_STUDIO_API}/variants/${variantId}`, {
+          method: "DELETE",
+          headers: authHeaders(),
+        });
+      } catch {
+        // local fallback continues below
+      }
+    }
     setResumeVariants((current) => current.filter((variant) => variant.id !== variantId));
   };
 
@@ -1566,19 +1940,151 @@ Key Requirements:
   };
 
   const createShareLink = () => {
+    if (hasApiSession()) {
+      void (async () => {
+        try {
+          const response = await fetch(`${RESUME_STUDIO_API}/share-links`, {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({
+              title: `${structuredResumeDraft.name || "Resume"} Share Link`,
+              template_style: selectedTemplate,
+              structured_resume_json: buildStructuredResumePayload(),
+              design_tokens_json: buildDesignTokensPayload(),
+              selected_sections_json: selectedSections,
+              cv_text: editableCvContent,
+              cover_letter_text: editableCoverLetterContent,
+              profile_photo_data: selectedProfilePhoto,
+            }),
+          });
+
+          if (response.ok) {
+            const body = await response.json();
+            setShareResumeUrl(body.url);
+            return;
+          }
+        } catch {
+          // fallback below
+        }
+
+        const payload = encodeURIComponent(
+          JSON.stringify({
+            template: selectedTemplate,
+            cv: editableCvContent,
+            coverLetter: editableCoverLetterContent,
+            headingFont: selectedHeadingFont,
+            bodyFont: selectedBodyFont,
+            textColor,
+            accentColor,
+            paperColor,
+            backgroundColor,
+            sidebarColor,
+            lineHeightScale,
+            fontScale,
+            sidebarWidth,
+            sectionDensity,
+            dividerStyle,
+            photo: selectedProfilePhoto,
+            sections: selectedSections,
+          })
+        );
+        const link = `${window.location.origin}${window.location.pathname}#resume-share=${payload}`;
+        setShareResumeUrl(link);
+      })();
+      return;
+    }
+
     const payload = encodeURIComponent(
       JSON.stringify({
         template: selectedTemplate,
         cv: editableCvContent,
         coverLetter: editableCoverLetterContent,
+        headingFont: selectedHeadingFont,
+        bodyFont: selectedBodyFont,
+        textColor,
+        accentColor,
+        paperColor,
+        backgroundColor,
+        sidebarColor,
+        lineHeightScale,
+        fontScale,
+        sidebarWidth,
+        sectionDensity,
+        dividerStyle,
+        photo: selectedProfilePhoto,
+        sections: selectedSections,
       })
     );
     const link = `${window.location.origin}${window.location.pathname}#resume-share=${payload}`;
     setShareResumeUrl(link);
   };
 
+  const copyShareLink = async () => {
+    if (!shareResumeUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareResumeUrl);
+    } catch {
+      window.prompt("Copy share link", shareResumeUrl);
+    }
+  };
+
+  const exportDocxCompatibleFile = () => {
+    const previewHtml = document.getElementById("resume-preview-surface")?.innerHTML ?? "";
+    if (hasApiSession()) {
+      void (async () => {
+        try {
+          const response = await fetch(`${RESUME_STUDIO_API}/export/doc`, {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({
+              title: structuredResumeDraft.name || "Resume",
+              file_name: (structuredResumeDraft.name || "resume").replace(/\s+/g, "-").toLowerCase(),
+              document_html: previewHtml,
+              document_css: buildExportCss(),
+            }),
+          });
+
+          if (response.ok) {
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${(structuredResumeDraft.name || "resume").replace(/\s+/g, "-").toLowerCase()}.doc`;
+            link.click();
+            URL.revokeObjectURL(url);
+            return;
+          }
+        } catch {
+          // fallback below
+        }
+
+        const html = `<html><head><meta charset="utf-8" /><title>${structuredResumeDraft.name || "Resume"}</title><style>${buildExportCss()}</style></head><body>${previewHtml}</body></html>`;
+        const blob = new Blob([html], { type: "application/msword" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${(structuredResumeDraft.name || "resume").replace(/\s+/g, "-").toLowerCase()}.doc`;
+        link.click();
+        URL.revokeObjectURL(url);
+      })();
+      return;
+    }
+
+    const html = `<html><head><meta charset="utf-8" /><title>${structuredResumeDraft.name || "Resume"}</title><style>${buildExportCss()}</style></head><body>${previewHtml}</body></html>`;
+    const blob = new Blob([html], { type: "application/msword" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${(structuredResumeDraft.name || "resume").replace(/\s+/g, "-").toLowerCase()}.doc`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const runDesignAssistant = () => {
     const notes: string[] = [];
+    const contentDensity = editableCvContent.split("\n").filter(Boolean).length;
+    const safestTemplate = selectedProfilePhoto ? "modern" : "classic";
+
     if (selectedTemplate === "modern" && !selectedProfilePhoto) {
       notes.push("Modern looks stronger with a profile photo. Upload one and use Auto frame face.");
     }
@@ -1594,10 +2100,24 @@ Key Requirements:
     if (lineHeightScale < 1.45) {
       notes.push("Line height is a bit tight. Raise it slightly for better scanability.");
     }
+    if (selectedTemplate !== safestTemplate && atsDesignWarnings.length > 1) {
+      notes.push(`For ATS-heavy submissions, ${TEMPLATE_LABELS[safestTemplate]} is the safer current template choice.`);
+    }
+    if (contentDensity > 34) {
+      notes.push("This resume is content-dense. Reduce font scale slightly or move one lower-value section into another variant.");
+    }
+    if (!structuredResumeDraft.summary.length) {
+      notes.push("Add a professional summary block. Designs with a blank opening section feel unfinished and under-tailored.");
+    }
     if (!notes.length) {
       notes.push("The current design is balanced. Next improvement: save this as a named preset and create a role-specific variant.");
     }
     setDesignAssistantNotes(notes);
+  };
+
+  const applyStructuredResumeDraft = () => {
+    setEditableCvContent(buildResumeFromStructured(structuredResumeDraft));
+    setDocPreviewMode(true);
   };
 
   const createCvFromSelectedDesign = () => {
@@ -2554,7 +3074,9 @@ Key Requirements:
           </div>
           <div className={`a4-cv-container template-${selectedTemplate} ${docPreviewMode ? "preview-mode" : ""}`} style={cvFontStyle}>
             {docPreviewMode ? (
-              renderDocumentPreview(activeDocTab === 'cv' ? editableCvContent : editableCoverLetterContent)
+              <div id="resume-preview-surface">
+                {renderDocumentPreview(activeDocTab === 'cv' ? editableCvContent : editableCoverLetterContent)}
+              </div>
             ) : activeDocTab === 'cv' ? (
               <textarea 
                 className="a4-cv-editor"
@@ -2787,6 +3309,50 @@ Key Requirements:
                   </div>
                 ))}
               </div>
+              <div className="structured-editor">
+                <h4>Structured Resume Fields</h4>
+                <div className="font-control">
+                  <label htmlFor="structuredName">Name</label>
+                  <input id="structuredName" value={structuredResumeDraft.name} onChange={(e) => setStructuredResumeDraft((current) => ({ ...current, name: e.target.value }))} />
+                </div>
+                <div className="font-control">
+                  <label htmlFor="structuredTitle">Target title</label>
+                  <input id="structuredTitle" value={structuredResumeDraft.title} onChange={(e) => setStructuredResumeDraft((current) => ({ ...current, title: e.target.value }))} />
+                </div>
+                <div className="font-control">
+                  <label htmlFor="structuredContact">Contact</label>
+                  <textarea id="structuredContact" value={structuredResumeDraft.contact.join("\n")} onChange={(e) => setStructuredResumeDraft((current) => ({ ...current, contact: e.target.value.split("\n").map((line) => line.trim()).filter(Boolean) }))} />
+                </div>
+                <div className="font-control">
+                  <label htmlFor="structuredSummary">Professional summary</label>
+                  <textarea id="structuredSummary" value={structuredResumeDraft.summary.join("\n")} onChange={(e) => setStructuredResumeDraft((current) => ({ ...current, summary: e.target.value.split("\n").map((line) => line.trim()).filter(Boolean) }))} />
+                </div>
+                <div className="font-control">
+                  <label htmlFor="structuredSkills">Skills (one per line)</label>
+                  <textarea id="structuredSkills" value={structuredResumeDraft.skills.join("\n")} onChange={(e) => setStructuredResumeDraft((current) => ({ ...current, skills: e.target.value.split("\n").map((line) => line.trim()).filter(Boolean) }))} />
+                </div>
+                <div className="font-control">
+                  <label htmlFor="structuredExperience">Professional experience</label>
+                  <textarea id="structuredExperience" value={structuredResumeDraft.experience.join("\n")} onChange={(e) => setStructuredResumeDraft((current) => ({ ...current, experience: e.target.value.split("\n").map((line) => line.trim()).filter(Boolean) }))} />
+                </div>
+                <div className="font-control">
+                  <label htmlFor="structuredProjects">Projects</label>
+                  <textarea id="structuredProjects" value={structuredResumeDraft.projects.join("\n")} onChange={(e) => setStructuredResumeDraft((current) => ({ ...current, projects: e.target.value.split("\n").map((line) => line.trim()).filter(Boolean) }))} />
+                </div>
+                <div className="font-control">
+                  <label htmlFor="structuredEducation">Education</label>
+                  <textarea id="structuredEducation" value={structuredResumeDraft.education.join("\n")} onChange={(e) => setStructuredResumeDraft((current) => ({ ...current, education: e.target.value.split("\n").map((line) => line.trim()).filter(Boolean) }))} />
+                </div>
+                <div className="font-control">
+                  <label htmlFor="structuredLanguages">Languages</label>
+                  <textarea id="structuredLanguages" value={structuredResumeDraft.languages.join("\n")} onChange={(e) => setStructuredResumeDraft((current) => ({ ...current, languages: e.target.value.split("\n").map((line) => line.trim()).filter(Boolean) }))} />
+                </div>
+                <div className="font-control">
+                  <label htmlFor="structuredCerts">Certifications</label>
+                  <textarea id="structuredCerts" value={structuredResumeDraft.certifications.join("\n")} onChange={(e) => setStructuredResumeDraft((current) => ({ ...current, certifications: e.target.value.split("\n").map((line) => line.trim()).filter(Boolean) }))} />
+                </div>
+                <button type="button" className="btn-secondary studio-action" onClick={applyStructuredResumeDraft}>Apply structured fields to CV</button>
+              </div>
             </>
           )}
 
@@ -2795,7 +3361,7 @@ Key Requirements:
               <button type="button" className="btn-secondary studio-action" onClick={() => setDocPreviewMode(true)}>Preview print layout</button>
               <button type="button" className="btn-secondary studio-action" onClick={runDesignAssistant}>Improve design</button>
               <button type="button" className="btn-secondary studio-action" onClick={() => window.print()}>Export PDF</button>
-              <button type="button" className="btn-secondary studio-action" onClick={() => alert("DOCX export will preserve the selected design tokens.")}>Export DOCX</button>
+              <button type="button" className="btn-secondary studio-action" onClick={exportDocxCompatibleFile}>Export DOC</button>
               <div className="font-control">
                 <label htmlFor="variantName">Save resume variant</label>
                 <input id="variantName" value={variantName} onChange={(e) => setVariantName(e.target.value)} placeholder="Senior BA - ATS safe" />
@@ -2819,6 +3385,7 @@ Key Requirements:
                 </div>
               )}
               <button type="button" className="btn-secondary studio-action" onClick={createShareLink}>Create share link</button>
+              <button type="button" className="btn-secondary studio-action" onClick={copyShareLink} disabled={!shareResumeUrl}>Copy share link</button>
               {shareResumeUrl && <textarea readOnly className="share-link-box" value={shareResumeUrl} />}
               {designAssistantNotes.length > 0 && (
                 <div className="design-assistant-notes">
