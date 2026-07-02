@@ -101,6 +101,45 @@ class WorkerClient
         return $workerTask;
     }
 
+    /**
+     * Resume an existing worker task from a checkpoint by re-enqueuing it to worker.
+     */
+    public function resume(WorkerTask $task, array $extraPayload = []): WorkerTask
+    {
+        $mergedPayload = array_merge($task->payload_json ?? [], $extraPayload, [
+            'local_task_id' => $task->id,
+        ]);
+
+        $task->update([
+            'status' => 'running',
+            'payload_json' => $mergedPayload,
+            'last_error' => null,
+            'next_retry_at' => null,
+        ]);
+
+        $this->event($task, 'task.resume.requested', [
+            'checkpoint' => $extraPayload['resume_from_checkpoint'] ?? null,
+        ]);
+
+        try {
+            $response = Http::timeout(5)->post("{$this->baseUrl}/tasks/enqueue", [
+                'user_id' => $task->user_id,
+                'task_type' => $task->task_type,
+                'payload' => $mergedPayload,
+            ]);
+
+            if ($response->successful()) {
+                $this->event($task, 'task.resume.enqueued');
+            } else {
+                $this->markFailed($task, "Resume HTTP {$response->status()}");
+            }
+        } catch (\Throwable $e) {
+            $this->markFailed($task, 'Resume failed: '.$e->getMessage());
+        }
+
+        return $task->refresh();
+    }
+
     private function markFailed(WorkerTask $task, string $error): void
     {
         $attempt = ((int) $task->attempts) + 1;

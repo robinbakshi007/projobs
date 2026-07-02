@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\Concerns\ResolvesApiUser;
 use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\TailoringRun;
+use App\Services\AutoSubmitPolicyService;
 use App\Services\WorkerClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,7 +15,10 @@ class ReviewController extends Controller
 {
     use ResolvesApiUser;
 
-    public function __construct(private readonly WorkerClient $workerClient) {}
+    public function __construct(
+        private readonly WorkerClient $workerClient,
+        private readonly AutoSubmitPolicyService $autoSubmitPolicy,
+    ) {}
 
     public function queue(Request $request): JsonResponse
     {
@@ -72,6 +76,14 @@ class ReviewController extends Controller
 
         $application->status = 'approved';
         $application->save();
+
+        if (! $this->autoSubmitPolicy->isEnabledForTenant($this->currentTenant())) {
+            return response()->json([
+                'message' => 'Application approved. Auto-submit is currently disabled by platform policy.',
+                'worker_task_id' => null,
+                'auto_submit_enabled' => false,
+            ]);
+        }
 
         $task = $this->workerClient->enqueue(
             taskType: 'apply',

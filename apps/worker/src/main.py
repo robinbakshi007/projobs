@@ -30,6 +30,10 @@ class TaskType(str, Enum):
 class TaskStatus(str, Enum):
     queued = "queued"
     running = "running"
+    waiting_for_code = "waiting_for_code"
+    waiting_for_review = "waiting_for_review"
+    blocked = "blocked"
+    completed = "completed"
     succeeded = "succeeded"
     failed = "failed"
 
@@ -127,23 +131,153 @@ def _run_scrape_task(task: WorkerTask) -> None:
 def _run_apply_task(task: WorkerTask) -> None:
     task.status = TaskStatus.running
 
-    application_id = task.payload.get("application_id")
-    if not application_id:
+    payload = task.payload
+    local_task_id = payload.get("local_task_id")
+
+    _post_checkpoint_status(
+        local_task_id,
+        "running",
+        "login",
+        {"message": "Starting apply runbook"},
+    )
+
+    application_ids = payload.get("application_ids")
+    if application_ids is None:
+        single_id = payload.get("application_id")
+        application_ids = [single_id] if single_id else []
+
+    # Backward-compatible fallback for session payloads that do not include application IDs.
+    if not application_ids and payload.get("session_id"):
         task.status = TaskStatus.failed
-        task.payload["_error"] = "application_id missing"
+        task.payload["_error"] = "application_ids missing for session payload"
+        _post_checkpoint_status(
+            local_task_id,
+            "failed",
+            "login",
+            {"error": task.payload["_error"]},
+        )
+        return
+
+    if not application_ids:
+        task.status = TaskStatus.failed
+        task.payload["_error"] = "application_id(s) missing"
+        _post_checkpoint_status(
+            local_task_id,
+            "failed",
+            "login",
+            {"error": task.payload["_error"]},
+        )
+        return
+
+    if payload.get("requires_otp") and not payload.get("otp_code"):
+        task.status = TaskStatus.waiting_for_code
+        _post_checkpoint_status(
+            local_task_id,
+            "waiting_for_code",
+            "otp_challenge",
+            {"reason": "otp_required", "provider": payload.get("provider", "seek")},
+        )
+        return
+
+    retry_policy = payload.get("retry_policy") or {
+        "captcha_max_retries": 2,
+        "unexpected_field_max_retries": 1,
+    }
+    captcha_max_retries = int(retry_policy.get("captcha_max_retries", 2))
+    unexpected_max_retries = int(retry_policy.get("unexpected_field_max_retries", 1))
+
+    captcha_retries = 0
+    unexpected_retries = 0
+
+    if payload.get("simulate_captcha"):
+        while captcha_retries < captcha_max_retries:
+            captcha_retries += 1
+            _post_checkpoint_status(
+                local_task_id,
+                "running",
+                "captcha_escalation",
+                {"attempt": captcha_retries, "max": captcha_max_retries},
+            )
+
+        task.status = TaskStatus.blocked
+        _post_checkpoint_status(
+            local_task_id,
+            "blocked",
+            "captcha_escalation",
+            {"reason": "captcha_retry_exhausted", "attempts": captcha_retries},
+        )
+        return
+
+    if payload.get("simulate_unexpected_field"):
+        while unexpected_retries < unexpected_max_retries:
+            unexpected_retries += 1
+            _post_checkpoint_status(
+                local_task_id,
+                "running",
+                "unexpected_field",
+                {"attempt": unexpected_retries, "max": unexpected_max_retries},
+            )
+
+        task.status = TaskStatus.blocked
+        _post_checkpoint_status(
+            local_task_id,
+            "blocked",
+            "unexpected_field",
+            {"reason": "unexpected_field_retry_exhausted", "attempts": unexpected_retries},
+        )
+        return
+
+    _post_checkpoint_status(local_task_id, "running", "form_fill", {"applications": len(application_ids)})
+
+    for application_id in application_ids:
+        _post_callback(
+            "/api/v1/internal/worker/apply-progress",
+            {
+                "application_id": application_id,
+                "step": "review-approved-dispatch",
+                "status": "done",
+                "metadata": {"mode": payload.get("mode", "review")},
+            },
+        )
+
+    if payload.get("submit_enabled") is not True:
+        task.status = TaskStatus.waiting_for_review
+        _post_checkpoint_status(
+            local_task_id,
+            "waiting_for_review",
+            "review_gate",
+            {"reason": "review_required", "resume_needed": True},
+        )
+        return
+
+    _post_checkpoint_status(local_task_id, "running", "submit", {"mode": "auto"})
+
+    for application_id in application_ids:
+        _post_callback(
+            "/api/v1/internal/worker/apply-complete",
+            {
+                "application_id": application_id,
+                "status": "applied",
+            },
+        )
+
+    task.status = TaskStatus.completed
+    _post_checkpoint_status(local_task_id, "completed", "submit", {"submitted": len(application_ids)})
+
+
+def _post_checkpoint_status(task_id: int | None, status: str, checkpoint_code: str, details: dict) -> None:
+    if not task_id:
         return
 
     _post_callback(
-        "/api/v1/internal/worker/apply-progress",
+        "/api/v1/internal/worker/checkpoint-status",
         {
-            "application_id": application_id,
-            "step": "review-approved-dispatch",
-            "status": "done",
-            "metadata": {"mode": "review"},
+            "task_id": task_id,
+            "status": status,
+            "checkpoint_code": checkpoint_code,
+            "details": details,
         },
     )
-
-    task.status = TaskStatus.succeeded
 
 
 def _post_callback(path: str, body: dict) -> None:

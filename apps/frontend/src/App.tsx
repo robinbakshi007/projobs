@@ -78,7 +78,7 @@ const journeys = [
   ["ATS Match Studio", "Completed (matched vs missing keyword details)", "100%", "Explanation of matches and estimated ATS scoring recommendations"],
   ["Recruiter CRM", "Completed (Salesforce-like recruiter contact board)", "100%", "Track recruiter interactions, next action steps, and notes"],
   ["CV & Cover Letter Tailoring", "Completed (dynamic auto-injection and tailoring)", "100%", "Modify resume text and cover letters on the fly to apply directly"],
-  ["Seek Auto-Apply Agent", "Completed (cookie sharing and extension integration)", "100%", "Cookie credential parser and link to companion browser extension"],
+  ["Seek Auto-Apply Agent", "Completed (session handoff with controlled browser profile)", "100%", "No plugin required; Playwright reuses authenticated controlled session with OTP pause/resume"],
   ["LinkedIn Auto-Apply Agent", "Completed (EasyApply scripts and forms handler)", "100%", "Chrome extension companion handles multi-step Easy Apply fields"],
   ["Interview Buddy", "Completed (audio speech output & dictation recognition)", "100%", "Practice mock interviews using text-to-speech and speech-to-text"],
   ["Tenant Workspace Switcher", "Completed (workspace selector on sidebar footer)", "100%", "Workspace settings sync in real-time without reloading"],

@@ -13,6 +13,8 @@ class AutomationCheckpoint extends Model
         'tenant_id',
         'user_id',
         'worker_task_id',
+        'skill_code',
+        'selector_version',
         'checkpoint_code',
         'status',
         'details_json',

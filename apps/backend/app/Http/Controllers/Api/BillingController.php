@@ -201,8 +201,8 @@ class BillingController extends Controller
         $encryptedWebhookSecret = $value['webhook_secret_encrypted'] ?? null;
 
         if (! $encryptedWebhookSecret) {
-            // If no webhook secret is configured, accept the event (dev mode).
-            return true;
+            // Fail closed outside local/testing when webhook secret is missing.
+            return app()->environment(['local', 'testing']);
         }
 
         $webhookSecret = decrypt($encryptedWebhookSecret);

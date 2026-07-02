@@ -30,6 +30,8 @@ class ResilienceController extends Controller
     {
         $validated = $request->validate([
             'worker_task_id' => ['nullable', 'integer', 'exists:worker_tasks,id'],
+            'skill_code' => ['nullable', 'string', 'max:80'],
+            'selector_version' => ['nullable', 'string', 'max:32'],
             'checkpoint_code' => ['required', 'string', 'max:80'],
             'status' => ['required', 'in:pending,passed,failed,needs_review'],
             'details_json' => ['nullable', 'array'],
@@ -39,6 +41,8 @@ class ResilienceController extends Controller
             'tenant_id' => $this->currentTenantId(),
             'user_id' => $this->resolveApiUserId(),
             'worker_task_id' => $validated['worker_task_id'] ?? null,
+            'skill_code' => $validated['skill_code'] ?? null,
+            'selector_version' => $validated['selector_version'] ?? null,
             'checkpoint_code' => $validated['checkpoint_code'],
             'status' => $validated['status'],
             'details_json' => $validated['details_json'] ?? null,

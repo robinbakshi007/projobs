@@ -137,6 +137,33 @@ interface DiffData {
   }>;
 }
 
+interface AutoSubmitPolicyView {
+  tenant_id: number;
+  global_enabled: boolean;
+  tenant_enabled: boolean;
+  effective_enabled: boolean;
+}
+
+interface OtpChallengeView {
+  id: number;
+  worker_task_id: number | null;
+  provider: string;
+  challenge_ref: string | null;
+  status: string;
+  code_expires_at: string | null;
+}
+
+interface SessionVaultView {
+  id: number;
+  provider: string;
+  label: string | null;
+  status: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+  last_used_at: string | null;
+  created_at: string;
+}
+
 const PARSE_STEPS = [
   "Scanning CV structure",
   "Finding recipe for your profile",
@@ -750,7 +777,7 @@ export default function JobDiscovery() {
 
   const [activeJobTab, setActiveJobTab] = useState<"job" | "cv" | "coverletter" | "ats" | "interview" | "automation" | "notes">("job");
   const [jobNotes, setJobNotes] = useState<Record<number, string>>({});
-  const [automationCookies, setAutomationCookies] = useState<string>(() => localStorage.getItem("automation_cookies") ?? "");
+  const [automationCookies, setAutomationCookies] = useState<string>("");
   const [cookieSharingSaved, setCookieSharingSaved] = useState(false);
   const [mockQuestions, setMockQuestions] = useState<Array<{ question: string; answer: string; feedback: string; score: number | null }>>([]);
   const [activeQuestionIdx, setActiveQuestionIdx] = useState(0);
@@ -813,6 +840,135 @@ export default function JobDiscovery() {
 
   const [jobUrlInput, setJobUrlInput] = useState("");
   const [isGroundingUrl, setIsGroundingUrl] = useState(false);
+  const [policyView, setPolicyView] = useState<AutoSubmitPolicyView | null>(null);
+  const [otpChallenges, setOtpChallenges] = useState<OtpChallengeView[]>([]);
+  const [sessionVaultRows, setSessionVaultRows] = useState<SessionVaultView[]>([]);
+  const [sessionVaultInput, setSessionVaultInput] = useState("");
+  const [sessionVaultProvider, setSessionVaultProvider] = useState("seek");
+  const [otpCodeInput, setOtpCodeInput] = useState("");
+  const [selectedOtpChallengeId, setSelectedOtpChallengeId] = useState<number | null>(null);
+
+  const loadAutoSubmitPolicy = async () => {
+    try {
+      const response = await fetch(`${API}/automation/auto-submit-policy`, {
+        headers: authHeaders(),
+      });
+      if (!response.ok) return;
+      const body = await response.json();
+      setPolicyView(body as AutoSubmitPolicyView);
+    } catch {
+      // ignore
+    }
+  };
+
+  const loadOtpChallenges = async () => {
+    try {
+      const response = await fetch(`${API}/automation/otp-challenges?status=waiting_for_code`, {
+        headers: authHeaders(),
+      });
+      if (!response.ok) return;
+      const body = await response.json();
+      const rows = (body.data ?? []) as OtpChallengeView[];
+      setOtpChallenges(rows);
+      if (rows.length > 0 && selectedOtpChallengeId === null) {
+        setSelectedOtpChallengeId(rows[0].id);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const loadSessionVaultRows = async () => {
+    try {
+      const response = await fetch(`${API}/automation/session-vault`, {
+        headers: authHeaders(),
+      });
+      if (!response.ok) return;
+      const body = await response.json();
+      setSessionVaultRows((body.data ?? []) as SessionVaultView[]);
+    } catch {
+      // ignore
+    }
+  };
+
+  const saveSessionHandoff = async () => {
+    const trimmed = sessionVaultInput.trim();
+    if (!trimmed) {
+      setAutoApplyStatus("Session handoff reference cannot be empty.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API}/automation/session-vault`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          provider: sessionVaultProvider,
+          session_ref: trimmed,
+          label: `Session handoff ${new Date().toISOString()}`,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Session handoff save failed (${response.status})`);
+      }
+
+      setSessionVaultInput("");
+      setCookieSharingSaved(true);
+      setTimeout(() => setCookieSharingSaved(false), 2000);
+      setAutoApplyStatus("Session handoff reference saved in encrypted vault.");
+      await loadSessionVaultRows();
+    } catch (err) {
+      setAutoApplyStatus(err instanceof Error ? err.message : "Session handoff save failed");
+    }
+  };
+
+  const submitOtpAndResume = async () => {
+    if (!selectedOtpChallengeId) {
+      setAutoApplyStatus("Select an OTP challenge first.");
+      return;
+    }
+    if (!otpCodeInput.trim()) {
+      setAutoApplyStatus("Enter the OTP code first.");
+      return;
+    }
+
+    try {
+      const challenge = otpChallenges.find((row) => row.id === selectedOtpChallengeId);
+      if (!challenge || !challenge.worker_task_id) {
+        throw new Error("Selected OTP challenge is not linked to a task.");
+      }
+
+      const submitResponse = await fetch(`${API}/automation/otp-challenges/${selectedOtpChallengeId}/submit`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ code: otpCodeInput.trim() }),
+      });
+
+      if (!submitResponse.ok) {
+        throw new Error(`OTP submit failed (${submitResponse.status})`);
+      }
+
+      const resumeResponse = await fetch(`${API}/automation/worker-tasks/${challenge.worker_task_id}/resume`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          checkpoint_code: "otp_challenge",
+          otp_challenge_id: selectedOtpChallengeId,
+        }),
+      });
+
+      if (!resumeResponse.ok) {
+        throw new Error(`Task resume failed (${resumeResponse.status})`);
+      }
+
+      setOtpCodeInput("");
+      setAutoApplyStatus("OTP accepted and worker task resumed from checkpoint.");
+      await loadOtpChallenges();
+    } catch (err) {
+      setAutoApplyStatus(err instanceof Error ? err.message : "OTP resume failed");
+    }
+  };
 
   useEffect(() => {
     if (selectedTemplate === "modern") {
@@ -850,6 +1006,9 @@ export default function JobDiscovery() {
   useEffect(() => {
     loadPreferences();
     loadResults();
+    loadAutoSubmitPolicy();
+    loadOtpChallenges();
+    loadSessionVaultRows();
     
     // Initialize Web Speech Recognition
     const win = window as any;
@@ -879,6 +1038,12 @@ export default function JobDiscovery() {
       };
       setSpeechRecognitionInstance(rec);
     }
+
+    const interval = window.setInterval(() => {
+      void loadOtpChallenges();
+    }, 6000);
+
+    return () => window.clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -2942,40 +3107,88 @@ Key Requirements:
               <div className="sf-tab-automation" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 <div className="cv-designs-card" style={{ padding: '1.25rem', borderLeft: '4px solid #3b82f6' }}>
                   <h4 style={{ margin: 0 }}>Playwright Auto-Apply Console</h4>
-                  <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>Configure credentials and launch a backend Playwright browser task in review mode.</p>
+                  <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>Use session handoff (no plugin) and launch backend Playwright tasks with OTP pause/resume support.</p>
+                </div>
+
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '8px' }}>
+                  <h5 style={{ margin: '0 0 0.5rem 0' }}>Auto-Submit Policy Visibility</h5>
+                  {policyView ? (
+                    <div style={{ fontSize: '0.85rem', color: '#334155', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
+                      <div><strong>Global:</strong> {policyView.global_enabled ? 'Enabled' : 'Disabled'}</div>
+                      <div><strong>Tenant:</strong> {policyView.tenant_enabled ? 'Enabled' : 'Disabled'}</div>
+                      <div><strong>Effective:</strong> {policyView.effective_enabled ? 'Enabled' : 'Disabled'}</div>
+                    </div>
+                  ) : (
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>Policy data unavailable.</p>
+                  )}
                 </div>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '8px' }}>
-                    <h5 style={{ margin: '0 0 0.5rem 0' }}>Session Cookie Sharing</h5>
-                    <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.75rem', color: '#64748b' }}>Paste your Seek/LinkedIn cookies to authorize the Playwright agent to run under your session.</p>
+                    <h5 style={{ margin: '0 0 0.5rem 0' }}>Session Handoff Vault</h5>
+                    <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.75rem', color: '#64748b' }}>Paste the controlled browser session reference. It is encrypted server-side and can be revoked anytime.</p>
+                    <select
+                      value={sessionVaultProvider}
+                      onChange={(e) => setSessionVaultProvider(e.target.value)}
+                      style={{ width: '100%', marginBottom: '0.5rem', fontSize: '0.8rem', padding: '0.4rem', borderRadius: '4px', border: '1px solid #cbd5e1' }}
+                    >
+                      <option value="seek">SEEK</option>
+                      <option value="linkedin">LinkedIn</option>
+                      <option value="indeed">Indeed</option>
+                      <option value="glassdoor">Glassdoor</option>
+                    </select>
                     <textarea
-                      value={automationCookies}
-                      onChange={(e) => setAutomationCookies(e.target.value)}
-                      placeholder="[ { 'name': 'seek_token', 'value': '...' }, ... ]"
+                      value={sessionVaultInput}
+                      onChange={(e) => setSessionVaultInput(e.target.value)}
+                      placeholder="session-handoff-ref://seek/profile/tenant-user-session"
                       style={{ width: '100%', height: '80px', fontSize: '0.8rem', fontFamily: 'monospace', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1', resize: 'none' }}
                     />
-                    <button type="button" className="btn-secondary" style={{ marginTop: '0.5rem', width: '100%', fontSize: '0.8rem' }} onClick={() => {
-                      localStorage.setItem("automation_cookies", automationCookies);
-                      setCookieSharingSaved(true);
-                      setTimeout(() => setCookieSharingSaved(false), 2000);
-                    }}>
-                      {cookieSharingSaved ? "Cookies Saved" : "Save Session Cookies"}
+                    <button type="button" className="btn-secondary" style={{ marginTop: '0.5rem', width: '100%', fontSize: '0.8rem' }} onClick={saveSessionHandoff}>
+                      {cookieSharingSaved ? "Session Saved" : "Save Session Handoff"}
                     </button>
                   </div>
                   
                   <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '8px', display: 'flex', flexDirection: 'column' }}>
-                    <h5 style={{ margin: '0 0 0.5rem 0' }}>Chrome Helper Extension</h5>
-                    <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.75rem', color: '#64748b' }}>Install the companion extension to auto-fetch and sync your active job board sessions securely.</p>
-                    <div style={{ flexGrow: 1 }} />
-                    <a 
-                      href="#download-extension" 
-                      onClick={(e) => { e.preventDefault(); alert("Helper extension package (projobs-companion.zip) generated! Please unpack and load it in Chrome -> Developer Mode."); }}
-                      style={{ display: 'block', textAlign: 'center', background: '#6b46c1', color: 'white', textDecoration: 'none', padding: '0.5rem', borderRadius: '4px', fontWeight: 'bold', fontSize: '0.85rem' }}
+                    <h5 style={{ margin: '0 0 0.5rem 0' }}>OTP Pause/Resume</h5>
+                    <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.75rem', color: '#64748b' }}>When a job board requests a verification code, enter it here to resume from checkpoint.</p>
+                    <select
+                      value={selectedOtpChallengeId ?? ''}
+                      onChange={(e) => setSelectedOtpChallengeId(e.target.value ? Number(e.target.value) : null)}
+                      style={{ width: '100%', marginBottom: '0.5rem', fontSize: '0.8rem', padding: '0.4rem', borderRadius: '4px', border: '1px solid #cbd5e1' }}
                     >
-                      Download Extension Helper
-                    </a>
+                      <option value="">Select OTP Challenge</option>
+                      {otpChallenges.map((challenge) => (
+                        <option key={challenge.id} value={challenge.id}>
+                          #{challenge.id} {challenge.provider.toUpperCase()} ({challenge.status})
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      value={otpCodeInput}
+                      onChange={(e) => setOtpCodeInput(e.target.value)}
+                      placeholder="Enter OTP code"
+                      style={{ width: '100%', fontSize: '0.85rem', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1', marginBottom: '0.5rem' }}
+                    />
+                    <button type="button" className="btn-secondary" style={{ width: '100%', fontSize: '0.8rem' }} onClick={submitOtpAndResume}>
+                      Submit Code & Resume
+                    </button>
                   </div>
+                </div>
+
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '8px' }}>
+                  <h5 style={{ margin: '0 0 0.5rem 0' }}>Encrypted Session Vault Records</h5>
+                  {sessionVaultRows.length === 0 ? (
+                    <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>No stored session handoff references.</p>
+                  ) : (
+                    <div style={{ display: 'grid', gap: '0.35rem', fontSize: '0.8rem', color: '#334155' }}>
+                      {sessionVaultRows.slice(0, 5).map((row) => (
+                        <div key={row.id} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.25rem' }}>
+                          <span>#{row.id} {row.provider.toUpperCase()} {row.label ? `- ${row.label}` : ''}</span>
+                          <span>{row.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 
                 <div className="automation-trigger-section" style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>

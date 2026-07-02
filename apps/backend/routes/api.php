@@ -21,6 +21,9 @@ use App\Http\Controllers\Api\ResumeScanController;
 use App\Http\Controllers\Api\AgentController;
 use App\Http\Controllers\Api\JobDiscoveryController;
 use App\Http\Controllers\Api\BillingController;
+use App\Http\Controllers\Api\AutomationPolicyController;
+use App\Http\Controllers\Api\AutomationRuntimeController;
+use App\Http\Controllers\Api\AutomationSkillController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
@@ -107,6 +110,20 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/resume-studio/share-links', [ResumeStudioController::class, 'createShareLink']);
         Route::post('/resume-studio/export/doc', [ResumeStudioController::class, 'exportDoc']);
         Route::get('/billing/plans', [BillingController::class, 'plans']);
+        Route::get('/automation/auto-submit-policy', [AutomationPolicyController::class, 'show'])->middleware('tenant.admin');
+        Route::put('/automation/auto-submit-policy', [AutomationPolicyController::class, 'update'])->middleware('tenant.admin');
+        Route::get('/automation/otp-challenges', [AutomationRuntimeController::class, 'otpChallenges']);
+        Route::post('/automation/otp-challenges', [AutomationRuntimeController::class, 'createOtpChallenge']);
+        Route::post('/automation/otp-challenges/{challenge}/submit', [AutomationRuntimeController::class, 'submitOtpCode']);
+        Route::post('/automation/worker-tasks/{task}/resume', [AutomationRuntimeController::class, 'resumeTask']);
+        Route::get('/automation/session-vault', [AutomationRuntimeController::class, 'listSessionVault']);
+        Route::post('/automation/session-vault', [AutomationRuntimeController::class, 'createSessionVault']);
+        Route::delete('/automation/session-vault/{session}', [AutomationRuntimeController::class, 'revokeSessionVault']);
+        Route::get('/automation/skills', [AutomationSkillController::class, 'index'])->middleware('tenant.admin');
+        Route::post('/automation/skills', [AutomationSkillController::class, 'store'])->middleware('tenant.admin');
+        Route::get('/automation/skills/{skill}', [AutomationSkillController::class, 'show'])->middleware('tenant.admin');
+        Route::put('/automation/skills/{skill}', [AutomationSkillController::class, 'update'])->middleware('tenant.admin');
+        Route::post('/automation/skills/{skill}/publish', [AutomationSkillController::class, 'publish'])->middleware('tenant.admin');
 
         // Credential management (encrypted at rest)
         Route::get('/credentials', [CredentialController::class, 'index']);
@@ -131,6 +148,7 @@ Route::prefix('v1')->group(function (): void {
     // Internal worker callbacks — used by Python worker to report back
     Route::prefix('internal/worker')->middleware(['worker.signature', 'throttle:120,1'])->group(function (): void {
         Route::post('/scrape-complete', [\App\Http\Controllers\Api\Internal\WorkerCallbackController::class, 'scrapeComplete']);
+        Route::post('/checkpoint-status', [\App\Http\Controllers\Api\Internal\WorkerCallbackController::class, 'checkpointStatus']);
         Route::post('/apply-progress', [\App\Http\Controllers\Api\Internal\WorkerCallbackController::class, 'applyProgress']);
         Route::post('/apply-complete', [\App\Http\Controllers\Api\Internal\WorkerCallbackController::class, 'applyComplete']);
     });
