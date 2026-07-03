@@ -777,7 +777,6 @@ export default function JobDiscovery() {
 
   const [activeJobTab, setActiveJobTab] = useState<"job" | "cv" | "coverletter" | "ats" | "interview" | "automation" | "notes">("job");
   const [jobNotes, setJobNotes] = useState<Record<number, string>>({});
-  const [automationCookies, setAutomationCookies] = useState<string>("");
   const [cookieSharingSaved, setCookieSharingSaved] = useState(false);
   const [mockQuestions, setMockQuestions] = useState<Array<{ question: string; answer: string; feedback: string; score: number | null }>>([]);
   const [activeQuestionIdx, setActiveQuestionIdx] = useState(0);

@@ -952,6 +952,70 @@ thead th {
   font: inherit;
 }
 
+.dispatch-form select,
+.dispatch-form input {
+  border-radius: 10px;
+  border: 1px solid #c8d6e1;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.ollama-card {
+  border: 1px solid #d8e1ea;
+  border-radius: 12px;
+  background: #f8fbfe;
+  padding: 12px;
+  margin-bottom: 14px;
+}
+
+.policy-card {
+  border: 1px solid #d8e1ea;
+  border-radius: 12px;
+  background: #f6faf7;
+  padding: 12px;
+  margin-bottom: 14px;
+}
+
+.policy-card h3 {
+  margin: 0 0 8px;
+}
+
+.policy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #2a4052;
+}
+
+.policy-warning {
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  margin: 8px 0;
+}
+
+.ollama-card h3 {
+  margin: 0 0 6px;
+}
+
+.ollama-output {
+  margin: 0;
+  border: 1px solid #d8e1ea;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #1f2f3d;
+  padding: 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 240px;
+  overflow: auto;
+}
+
 .tasks-list {
   margin-top: 14px;
 }

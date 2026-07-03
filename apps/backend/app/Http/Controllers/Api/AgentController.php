@@ -5,12 +5,15 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Api\Concerns\ResolvesApiUser;
 use App\Http\Controllers\Controller;
 use App\Models\AgentTask;
+use App\Services\WorkerClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AgentController extends Controller
 {
     use ResolvesApiUser;
+
+    public function __construct(private readonly WorkerClient $workerClient) {}
 
     public function dispatchTask(Request $request): JsonResponse
     {
@@ -34,8 +37,11 @@ class AgentController extends Controller
             'status' => 'queued',
         ]);
 
+        $workerTask = $this->enqueueWorkerFromAgentTask($task, $validated['payload_json'] ?? []);
+
         return response()->json([
-            'data' => $task,
+            'data' => $task->fresh(),
+            'worker_task_id' => $workerTask?->id,
             'message' => 'Agent task dispatched',
         ], 201);
     }
@@ -101,7 +107,7 @@ class AgentController extends Controller
         $created = [];
 
         foreach ($validated['agents'] as $agent) {
-            $created[] = AgentTask::create([
+            $task = AgentTask::create([
                 'tenant_id' => $tenantId,
                 'user_id' => $userId,
                 'agent_id' => $agent['agent_id'],
@@ -110,6 +116,14 @@ class AgentController extends Controller
                 'extension_ref' => 'RobinBakshi/ollama-direct-custom-agent',
                 'status' => 'queued',
             ]);
+
+            $workerTask = $this->enqueueWorkerFromAgentTask($task, $agent['payload_json'] ?? []);
+            $task->result_json = array_merge($task->result_json ?? [], [
+                'worker_task_id' => $workerTask?->id,
+            ]);
+            $task->save();
+
+            $created[] = $task->fresh();
         }
 
         return response()->json([
@@ -133,5 +147,52 @@ class AgentController extends Controller
             403,
             'Unauthorized'
         );
+    }
+
+    private function enqueueWorkerFromAgentTask(AgentTask $task, array $payload): ?\App\Models\WorkerTask
+    {
+        $mappedTaskType = $this->mapAgentTaskTypeToWorkerType($task->task_type);
+        if ($mappedTaskType === null) {
+            $task->result_json = array_merge($task->result_json ?? [], [
+                'dispatch_notice' => 'No worker mapping for task_type',
+                'mapped_worker_task_type' => null,
+            ]);
+            $task->save();
+            return null;
+        }
+
+        $workerPayload = array_merge($payload, [
+            'agent_task_id' => $task->id,
+            'agent_id' => $task->agent_id,
+            'source' => $payload['source'] ?? 'seek',
+            'idempotency_key' => (string) $task->id,
+        ]);
+
+        $workerTask = $this->workerClient->enqueue(
+            taskType: $mappedTaskType,
+            payload: $workerPayload,
+            userId: (int) $task->user_id,
+            tenantId: (int) $task->tenant_id,
+            foreignRefId: (int) $task->id,
+        );
+
+        $task->result_json = array_merge($task->result_json ?? [], [
+            'mapped_worker_task_type' => $mappedTaskType,
+            'worker_task_id' => $workerTask->id,
+            'worker_task_status' => $workerTask->status,
+        ]);
+        $task->save();
+
+        return $workerTask;
+    }
+
+    private function mapAgentTaskTypeToWorkerType(string $taskType): ?string
+    {
+        return match ($taskType) {
+            'tailor_cv', 'write_cover', 'tailor' => 'tailor',
+            'apply_seek', 'apply_linkedin', 'apply' => 'apply',
+            'scrape_seek', 'scrape_jobs', 'discover_jobs', 'scrape' => 'scrape',
+            default => null,
+        };
     }
 }

@@ -71,3 +71,25 @@ export default defineConfig([
   },
 ])
 ```
+
+## Ollama integration (local)
+
+Set the local Ollama endpoint in apps/frontend/.env:
+
+```env
+VITE_OLLAMA_BASE_URL=http://127.0.0.1:11434
+```
+
+In the Agent Dashboard:
+
+- Use "List Models" to verify Ollama connectivity.
+- Select a model (or type one manually), then click "Test Model".
+- If a request fails, the error is shown inline with HTTP status and response details.
+
+Quick CLI checks (PowerShell):
+
+```powershell
+ollama --version
+ollama list
+ollama run gemma4:12b "Reply with OK"
+```
