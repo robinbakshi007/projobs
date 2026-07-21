@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { type CSSProperties } from "react";
 import "./JobDiscovery.css";
 import { jobController } from "../controllers/JobController";
@@ -919,6 +919,24 @@ export default function JobDiscovery() {
       await loadSessionVaultRows();
     } catch (err) {
       setAutoApplyStatus(err instanceof Error ? err.message : "Session handoff save failed");
+    }
+  };
+
+  const launchSeekLoginBrowser = async () => {
+    setAutoApplyStatus("Launching SEEK browser on host...");
+    try {
+      const response = await fetch(`${API}/automation/seek/init-profile`, {
+        method: "POST",
+        headers: authHeaders(),
+      });
+      if (response.ok) {
+        setAutoApplyStatus("SEEK login browser launched! Please log in on the browser window and close it when done.");
+      } else {
+        const body = (await response.json()) as { error?: string };
+        throw new Error(body.error || `Failed to launch browser (${response.status})`);
+      }
+    } catch (err) {
+      setAutoApplyStatus(err instanceof Error ? err.message : "Failed to launch browser");
     }
   };
 
@@ -3145,6 +3163,16 @@ Key Requirements:
                     <button type="button" className="btn-secondary" style={{ marginTop: '0.5rem', width: '100%', fontSize: '0.8rem' }} onClick={saveSessionHandoff}>
                       {cookieSharingSaved ? "Session Saved" : "Save Session Handoff"}
                     </button>
+                    {sessionVaultProvider === "seek" && (
+                      <button 
+                        type="button" 
+                        className="btn-secondary" 
+                        style={{ marginTop: '0.5rem', width: '100%', fontSize: '0.8rem', backgroundColor: '#e0f2fe', color: '#0369a1', borderColor: '#bae6fd' }} 
+                        onClick={launchSeekLoginBrowser}
+                      >
+                        Launch SEEK Browser for Login
+                      </button>
+                    )}
                   </div>
                   
                   <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '8px', display: 'flex', flexDirection: 'column' }}>

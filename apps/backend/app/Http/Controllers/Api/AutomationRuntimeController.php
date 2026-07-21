@@ -288,6 +288,20 @@ class AutomationRuntimeController extends Controller
         );
     }
 
+    public function initSeekProfile(Request $request): JsonResponse
+    {
+        $baseUrl = rtrim(config('services.worker.url', 'http://localhost:8001'), '/');
+        try {
+            $response = \Illuminate\Support\Facades\Http::timeout(5)->post("{$baseUrl}/automation/seek/init-profile");
+            if ($response->successful()) {
+                return response()->json(['message' => 'SEEK login browser session started on host.']);
+            }
+            return response()->json(['error' => 'Failed to initialize SEEK profile browser session on worker'], 502);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => 'Worker unreachable: ' . $e->getMessage()], 502);
+        }
+    }
+
     private function audit(string $action, string $entityType, int $entityId, array $metadata = []): void
     {
         DB::table('audit_events')->insert([

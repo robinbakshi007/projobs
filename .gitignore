@@ -1,4 +1,7 @@
 .venv311/
+.venv/
+venv/
+*.docx
 node_modules/
 dist/
 __pycache__/
@@ -6,3 +9,4 @@ __pycache__/
 .DS_Store
 *.node
 apps/worker/src/chrome_profile/
+

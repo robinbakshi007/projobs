@@ -77,8 +77,24 @@ def enqueue_task(request: EnqueueTaskRequest, background: BackgroundTasks) -> Wo
         background.add_task(_run_scrape_task, task)
     elif request.task_type == TaskType.apply:
         background.add_task(_run_apply_task, task)
+    elif request.task_type == TaskType.tailor:
+        background.add_task(_run_tailor_task, task)
 
     return task
+
+
+def _launch_seek_browser() -> None:
+    try:
+        from automation.init_seek_profile import bootstrap_seek_profile
+        bootstrap_seek_profile(user_data_dir="./chrome_profile")
+    except Exception:
+        pass
+
+
+@app.post("/automation/seek/init-profile")
+def init_seek_profile_endpoint(background: BackgroundTasks) -> dict:
+    background.add_task(_launch_seek_browser)
+    return {"message": "SEEK login browser session started on host."}
 
 
 @app.get("/tasks/{task_id}", response_model=WorkerTask)
@@ -140,6 +156,72 @@ def _run_apply_task(task: WorkerTask) -> None:
         "login",
         {"message": "Starting apply runbook"},
     )
+
+    job_url = payload.get("job_url")
+    if job_url:
+        try:
+            cv_content = payload.get("cv_content") or ""
+            cl_content = payload.get("cover_letter_content") or ""
+            submit_enabled = payload.get("submit_enabled", False)
+
+            import tempfile
+            from pathlib import Path
+            
+            temp_dir = Path(tempfile.mkdtemp())
+            cv_path = temp_dir / "CV.txt"
+            cv_path.write_text(cv_content, encoding="utf-8")
+            
+            cl_path = temp_dir / "CoverLetter.txt"
+            cl_path.write_text(cl_content, encoding="utf-8")
+
+            from automation.seek_applier import apply_to_seek
+            
+            chrome_profile_dir = Path(__file__).parent.resolve() / "chrome_profile"
+            
+            _post_checkpoint_status(
+                local_task_id,
+                "running",
+                "form_fill",
+                {"message": f"Opening headful browser. Saving in: {chrome_profile_dir}"},
+            )
+            
+            result = apply_to_seek(
+                job_url=job_url,
+                cv_path=str(cv_path),
+                cl_path=str(cl_path),
+                user_data_dir=str(chrome_profile_dir),
+                submit_enabled=submit_enabled,
+            )
+            
+            if result["status"] == "applied":
+                task.status = TaskStatus.completed
+                _post_checkpoint_status(
+                    local_task_id,
+                    "completed",
+                    "submit",
+                    {"message": result["message"], "evidence": result.get("evidence")},
+                )
+            elif result["status"] == "needs_review":
+                task.status = TaskStatus.waiting_for_review
+                _post_checkpoint_status(
+                    local_task_id,
+                    "waiting_for_review",
+                    "review_gate",
+                    {"message": result["message"], "evidence": result.get("evidence")},
+                )
+            else:
+                raise ValueError(result["message"])
+                
+        except Exception as exc:
+            task.status = TaskStatus.failed
+            task.payload["_error"] = str(exc)
+            _post_checkpoint_status(
+                local_task_id,
+                "failed",
+                "submit",
+                {"error": str(exc)},
+            )
+        return
 
     application_ids = payload.get("application_ids")
     if application_ids is None:
@@ -278,6 +360,73 @@ def _post_checkpoint_status(task_id: int | None, status: str, checkpoint_code: s
             "details": details,
         },
     )
+
+
+def _run_tailor_task(task: WorkerTask) -> None:
+    task.status = TaskStatus.running
+    payload = task.payload
+    local_task_id = payload.get("local_task_id")
+
+    _post_checkpoint_status(
+        local_task_id,
+        "running",
+        "tailor",
+        {"message": "Starting document tailoring"},
+    )
+
+    try:
+        agent_id = payload.get("agent_id")
+        jd_text = payload.get("jd_text") or payload.get("job_description") or ""
+
+        from document_engine.tailor_cv import tailor_cv
+        from document_engine.tailor_cover_letter import tailor_cover_letter
+
+        results = {}
+        if agent_id == "cv_tailor" or payload.get("cv_path"):
+            cv_path = payload.get("cv_path") or "./master_cv.docx"
+            output_path = payload.get("output_path") or "./tailored_cv.docx"
+            res = tailor_cv(
+                cv_path=cv_path,
+                jd_text=jd_text,
+                output_path=output_path,
+            )
+            results = {
+                "status": "succeeded",
+                "output_path": res["output_path"],
+                "placeholders_replaced": res["placeholders_replaced"],
+            }
+        elif agent_id == "cover_writer" or payload.get("sample_cl_path"):
+            sample_cl = payload.get("sample_cl_path") or "./sample_cover_letter.docx"
+            output_path = payload.get("output_path") or "./tailored_cover_letter.docx"
+            res = tailor_cover_letter(
+                sample_cl_path=sample_cl,
+                jd_text=jd_text,
+                output_path=output_path,
+            )
+            results = {
+                "status": "succeeded",
+                "output_path": res["output_path"],
+            }
+        else:
+            raise ValueError(f"Unknown agent/tailoring task: {agent_id}")
+
+        task.status = TaskStatus.completed
+        _post_checkpoint_status(
+            local_task_id,
+            "completed",
+            "tailor",
+            {"results": results},
+        )
+
+    except Exception as exc:
+        task.status = TaskStatus.failed
+        task.payload["_error"] = str(exc)
+        _post_checkpoint_status(
+            local_task_id,
+            "failed",
+            "tailor",
+            {"error": str(exc)},
+        )
 
 
 def _post_callback(path: str, body: dict) -> None:

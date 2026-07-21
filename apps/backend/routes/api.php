@@ -119,6 +119,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/automation/session-vault', [AutomationRuntimeController::class, 'listSessionVault']);
         Route::post('/automation/session-vault', [AutomationRuntimeController::class, 'createSessionVault']);
         Route::delete('/automation/session-vault/{session}', [AutomationRuntimeController::class, 'revokeSessionVault']);
+        Route::post('/automation/seek/init-profile', [AutomationRuntimeController::class, 'initSeekProfile']);
         Route::get('/automation/skills', [AutomationSkillController::class, 'index'])->middleware('tenant.admin');
         Route::post('/automation/skills', [AutomationSkillController::class, 'store'])->middleware('tenant.admin');
         Route::get('/automation/skills/{skill}', [AutomationSkillController::class, 'show'])->middleware('tenant.admin');
