@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 import ReviewMode from "./pages/ReviewMode";
 import "./pages/ReviewMode.css";
@@ -48,41 +48,41 @@ type UserRecord = {
 };
 
 const platformBuildoutRows = [
-  ["Email signup/login", "Completed (email account flow, local/offline fallback, auth shell)", "100%", "Connect production transactional email and expiry-backed verification codes."],
-  ["Email 2FA codes", "Completed (2FA UX and provider-ready verification flow)", "100%", "Wire SES, SendGrid, or Mailgun with audit logs before live launch."],
-  ["Google/Microsoft SSO", "Completed (SSO entry points, tenant mapping placeholders, callback-ready UX)", "100%", "Register OAuth clients and validate callback routes in production."],
-  ["CV upload/parser", "Completed (PDF/DOCX/TXT/RTF parsing with autofill and preview)", "100%", "Expand section extraction using more real CV samples."],
-  ["CV style swapping", "Completed (Modern, Classic, Creative selectors with apply preference)", "100%", "Persist selected template into generated PDF/DOCX output."],
-  ["AI CV tailoring", "Completed (truthful role alignment, keywords, KPIs, skills review)", "100%", "Keep human review required before submission."],
-  ["AI cover letter", "Completed (job-specific cover-letter editor and auto-tailor control)", "100%", "Add company-fact grounding once live search sources are connected."],
-  ["Job discovery", "Completed (preferences, scoring, filters, job workspace)", "100%", "Connect live SEEK/LinkedIn sources with throttling and ToS controls."],
-  ["Credential/session setup", "Completed (consent-first session setup and review-mode queue)", "100%", "Move credentials to encrypted vault storage before production."],
-  ["Browser apply agent", "Completed (browser automation console, review gate, task queue)", "100%", "Test selectors on live SEEK/LinkedIn pages before enabling final submit."],
-  ["Hermes-style scheduler", "Completed (command surface, tool gateway, skills memory, backend options)", "100%", "Back it with a durable scheduled worker and run history endpoint."],
-  ["Review queue", "Completed (approve/reject/edit-before-submit workflow)", "100%", "Make review queue the mandatory default for all job-board submissions."],
-  ["ATS scan", "Completed (visible role alignment, ATS systems, formatting, grammar, rewrite checks)", "100%", "Keep optimization visible; avoid hidden text and keyword stuffing."],
-  ["Analytics", "Completed (pipeline, source, funnel, interview and salary metrics)", "100%", "Backfill cohorts once real applications begin flowing."],
-  ["Product Activation", "Completed (onboarding milestones, pre-filled defaults, activation nudges)", "100%", "Keep tuning prompts from real onboarding drop-off data."],
-  ["Trust & Security", "Completed (MFA-ready controls, secret policy checks, anomaly alerts)", "100%", "Connect production SMS/provider credentials before live rollout."],
-  ["Review Intelligence", "Completed (explainable edits, confidence signals, reviewer notes)", "100%", "Add model comparison logs as usage grows."],
-  ["Automation Resilience", "Completed (adaptive selectors, canary checks, recovery checkpoints)", "100%", "Schedule recurring canary runs for each job-board connector."],
-  ["Outcome Analytics", "Completed (funnel, cohort, source ROI, conversion insights)", "100%", "Backfill historical cohorts once production data lands."],
-  ["Enterprise Controls", "Completed (advanced RBAC, tenant policy packs, compliance exports)", "100%", "Map policy packs to each enterprise contract."],
-  ["Operational Excellence", "Completed (ops panel, runbooks, chaos/load readiness)", "100%", "Wire runbooks to alert routing after deployment."],
+  ["Email signup/login", "Real auth with local fallbacks, registration/login", "85%", "Fix: forgotPassword/sendVerification token leak in JSON responses."],
+  ["Email 2FA codes", "MFA/SMS code routing and provider integration", "70%", "WireTwilio/Sinch with audit logs before production launch."],
+  ["Google/Microsoft SSO", "SSO entry points and callback-ready UI stubs", "15%", "Register OAuth client IDs and validate callback routes in production."],
+  ["CV upload/parser", "PDF/DOCX/TXT/RTF parser with auto-populate & preview", "85%", "Enhance data extraction precision across diverse formatting layouts."],
+  ["CV style swapping", "Modern, Classic, Creative selectors with design preferences", "90%", "Persist selected template configuration to the PDF exporter engine."],
+  ["AI CV tailoring", "Worker OpenAI tailoring & python-docx engine", "30%", "Wire worker-to-backend-to-UI delivery for generated docx files."],
+  ["AI cover letter", "AI-based cover-letter editor and tailoring", "30%", "Add company fact-grounding and resolve spacing collapsing bugs."],
+  ["Job discovery", "Preferences schema, filters, and dynamic workspace tabs", "80%", "Integrate real SEEK/LinkedIn scrapers with throttling controls."],
+  ["Credential/session setup", "Consent-first session vault handoff system", "55%", "Add encryption/rotation checks and test against real Seek 2FA."],
+  ["Browser apply agent", "Playwright worker with persistent context local profile", "50%", "Fix screenshot temp path on Windows and refine DOM selector logic."],
+  ["Hermes-style scheduler", "Worker task gateway and queue endpoints", "25%", "Transition from in-memory TASK_STORE dictionary to Redis/DB queue."],
+  ["Review queue", "Review gate, task state, and approve/skip routing", "75%", "Set review queue as the mandatory default before final apply submit."],
+  ["ATS scan", "Est. alignment score & Missing keywords highlighter", "10%", "Wire the mock analyze controller to a real parser/LLM service."],
+  ["Analytics", "Pipeline, funnel, and metrics backend database queries", "35%", "Connect the frontend panel widgets to the live backend analytics API."],
+  ["Product Activation", "Milestones tracker and pre-filled defaults", "50%", "Integrate frontend tracker with live backend quotas / analytics."],
+  ["Trust & Security", "MFA readiness, policy check controllers", "70%", "Secure auth token leaks and configure production SMS APIs."],
+  ["Review Intelligence", " Edits explanation & confidence metrics", "60%", "Heuristic-based checks; add model-backed scoring comparisons."],
+  ["Automation Resilience", "Checkpoints, OTP pause/resume sync", "55%", "Verify persistent session profiles across multiple devices."],
+  ["Outcome Analytics", "Cohort tracking, conversion rates", "30%", "Backfill user conversion tables once production data accumulates."],
+  ["Enterprise Controls", "Role based access, compliance exports", "20%", "Map tenant policy packs and implement compliance PDF generator."],
+  ["Operational Excellence", "Ops dashboard, recovery runbooks", "15%", "Wire automated failure alert routing to developers."],
 ];
 
 const journeys = [
-  ["PDF View Overlay (from CVGENIUS)", "Completed (streams PDFs inline with zoom/navigation)", "100%", "Integrated react-pdf rendering overlay with full page controls"],
-  ["Document Generation Wizard (from CVGENIUS)", "Completed (5-step guided wizard)", "100%", "Guided wizard that supports PDF/DOCX builds"],
-  ["Job Discovery Studio", "Completed (Salesforce Tabbed Workspace)", "100%", "Dynamic workspaces per job (CV, Cover Letter, ATS, Interview, automation)"],
-  ["ATS Match Studio", "Completed (matched vs missing keyword details)", "100%", "Explanation of matches and estimated ATS scoring recommendations"],
-  ["Recruiter CRM", "Completed (Salesforce-like recruiter contact board)", "100%", "Track recruiter interactions, next action steps, and notes"],
-  ["CV & Cover Letter Tailoring", "Completed (dynamic auto-injection and tailoring)", "100%", "Modify resume text and cover letters on the fly to apply directly"],
-  ["Seek Auto-Apply Agent", "Completed (session handoff with controlled browser profile)", "100%", "No plugin required; Playwright reuses authenticated controlled session with OTP pause/resume"],
-  ["LinkedIn Auto-Apply Agent", "Completed (EasyApply scripts and forms handler)", "100%", "Chrome extension companion handles multi-step Easy Apply fields"],
-  ["Interview Buddy", "Completed (audio speech output & dictation recognition)", "100%", "Practice mock interviews using text-to-speech and speech-to-text"],
-  ["Tenant Workspace Switcher", "Completed (workspace selector on sidebar footer)", "100%", "Workspace settings sync in real-time without reloading"],
-  ["Billing & Subscription panel", "Completed (Stripe payment flows & tier validation)", "100%", "Self-serve plans and credit checkout system"]
+  ["PDF View Overlay (from CVGENIUS)", "Streams PDFs inline with zoom controls", "85%", "Verify exact CSS rendering parity across browser engines."],
+  ["Document Generation Wizard (from CVGENIUS)", "Guided 5-step application wizard", "75%", "Support dynamic custom steps injection based on job type."],
+  ["Job Discovery Studio", "Tabbed job dashboard and candidate details", "80%", "Back with real grounding job search results instead of mocks."],
+  ["ATS Match Studio", "Missing keyword highlights and formatting analyzer", "15%", "Connect to actual AI resume parser analysis output."],
+  ["Recruiter CRM", "Recruiter contact board and interaction tracking", "15%", "Convert static demo constructor data to live API calls."],
+  ["CV & Cover Letter Tailoring", "On-the-fly text editing and tailoring", "30%", "Wire the worker tailoring result files to display in preview."],
+  ["Seek Auto-Apply Agent", "Controlled persistent profile browser launcher", "50%", "Open headful SEEK browser to save login cookies in local vault."],
+  ["LinkedIn Auto-Apply Agent", "Forms filler and extension companion stubs", "10%", "Implement the chrome extension EasyApply script handler."],
+  ["Interview Buddy", "Mock interview setup and practice session", "40%", "Replace hardcoded keyword checks with an LLM feedback endpoint."],
+  ["Tenant Workspace Switcher", "Footer switcher workspace settings sync", "85%", "Add permission enforcement checks when shifting contexts."],
+  ["Billing & Subscription panel", "Stripe payment gateway checkout flows", "80%", "Add mock alerts when Stripe credentials are not configured."]
 ];
 
 const featureReadinessRows = [
@@ -91,27 +91,27 @@ const featureReadinessRows = [
 ];
 
 const reactiveResumeLearningRows = [
-  ["CV template switching", "Strong (Modern, Classic, Creative with live design studio controls)", "90%", "Add 5-10 more production-grade templates and saved design packs."],
-  ["Thumbnail-accurate layouts", "Strong (Modern and Classic closely aligned, Creative enhanced)", "85%", "Finish exact visual parity for every thumbnail and every export mode."],
-  ["Font switching", "Complete (heading font, body font, size scale, line height, and saved style presets)", "100%", "Add locked enterprise typography kits when branding mode is introduced."],
-  ["Text color control", "Complete (live text color picker across templates)", "100%", "Add contrast safety guidance for ATS-safe themes."],
-  ["Accent color control", "Complete (live accent color for headings, dividers, bullets, and chips)", "100%", "Add locked palette presets for enterprise brand kits."],
-  ["Background color control", "Complete (paper, background, and sidebar color controls)", "100%", "Add gradient and texture-safe preset options."],
-  ["Profile photo upload", "Complete (upload, persistent gallery, selection, and removal controls)", "100%", "Upgrade gallery into multi-device cloud sync when backend media storage is ready."],
-  ["Photo editing", "Strong (brightness, contrast, zoom, crop, roundness, auto-frame)", "95%", "Upgrade auto-frame into real face detection and smart portrait crop."],
-  ["Icons in CV", "Strong (shared resume icon layer for contact and studio metadata)", "90%", "Adopt a full external icon library if we want broader template iconography."],
-  ["Structured resume data", "Strong (parsed CV, structured draft editor, backend profile sync, and section-aware rendering)", "90%", "Move fully to schema-backed nested blocks for jobs, projects, education, and contact fields."],
-  ["Section management", "Complete (show/hide controls, custom sections, and reorder controls)", "100%", "Add drag-and-drop ordering and richer custom section schemas."],
-  ["Layout controls", "Complete (sidebar width, density, divider style, and spacing-oriented controls)", "100%", "Add column balance and section-specific spacing rules."],
-  ["Color themes / presets", "Complete (preset themes plus saved reusable style presets)", "100%", "Add per-template theme locks for managed enterprise branding."],
-  ["Export fidelity", "Strong (print-to-PDF flow, backend DOC export, preview-first rendering)", "80%", "Make PDF/DOCX output match preview 1:1 with a dedicated renderer."],
-  ["Reusable design tokens", "Strong (fonts, colors, spacing, sidebar width, density, and divider style tokenized)", "92%", "Move remaining hardcoded template values into reusable token maps."],
-  ["Resume gallery / variants", "Complete (multiple saved resume variants with local actions and backend persistence)", "100%", "Add conflict resolution when multiple devices edit the same variant."],
-  ["Share / publish", "Strong (generated recruiter-safe share links with backend-hosted public resume routes)", "90%", "Add private links, expiry controls, and hosted analytics."],
-  ["AI design assistant", "Strong (heuristic improve-design guidance with template and density recommendations)", "80%", "Add model-backed template and readability recommendations."],
-  ["ATS-safe design warnings", "Complete (live warnings for photos, creative layouts, font scale, and space use)", "100%", "Add proper contrast scoring and exporter-aware ATS risk checks."],
-  ["Template customization UX", "Complete (Fonts, Colors, Photo, Layout, Sections, Export tabs with saved presets and variants)", "100%", "Add undo/redo as a polish layer rather than a missing core capability."],
-  ["Icon library integration", "Strong (shared internal icon layer across designer and preview)", "80%", "Adopt a broader icon pack if we need expanded visual language."],
+  ["CV template switching", "Modern, Classic, Creative templates with designer dashboard", "90%", "Add more industry-specific design templates to library."],
+  ["Thumbnail-accurate layouts", "Layout matching preview closely", "85%", "Finish exact visual parity for every design preset and export mode."],
+  ["Font switching", "Heading/body font, size, line spacing presets", "100%", "Typographical settings complete; saved style presets work."],
+  ["Text color control", "Custom text color colorpicker", "100%", "Contrast guidance warnings are live for dark/light themes."],
+  ["Accent color control", "Headings, dividers, chips, and bullets colors", "100%", "Live color pickers fully operational across all layouts."],
+  ["Background color control", "Paper, container, and sidebar background customization", "100%", "Live preview syncs perfectly without performance lag."],
+  ["Profile photo upload", "Upload, persistent gallery, select/remove options", "100%", "Upgrade to cloud media storage once backend is deployed."],
+  ["Photo editing", "Brightness, contrast, crop, zoom, photo roundness", "95%", "Integrate smart face centering model for portrait helper."],
+  ["Icons in CV", "Contact icons and metadata graphics", "90%", "Include a wider choice of external SVG icon packs."],
+  ["Structured resume data", "Parsed CV mapping and edit fields sync", "90%", "Transition fully to schema-backed nested JSON blocks."],
+  ["Section management", "Show/hide, rename, add custom sections, drag to sort", "100%", "Section state saving works and updates preview dynamically."],
+  ["Layout controls", "Density, margins, line spacing, sidebar width controls", "100%", "Spacing updates apply instantly in live preview window."],
+  ["Color themes / presets", "Design templates color packs and custom presets", "100%", "User can save and reload custom design packages."],
+  ["Export fidelity", "Vite print-to-PDF print styles, backend DOC export", "60%", "Vite print works; backend DOC uses HTML fallback, need OOXML."],
+  ["Reusable design tokens", "Colors, fonts, spacing, margins fully tokenized", "92%", "Move the remaining hardcoded values into the style token maps."],
+  ["Resume gallery / variants", "Multiple CV variants creation, loading, deleting", "100%", "Live variants sync and switching is fully supported."],
+  ["Share / publish", "Recruiter public links and view tracker counter", "90%", "Add private links passwords and analytics dashboard."],
+  ["AI design assistant", "Design guidelines checks and density alert helper", "80%", "Wire to AI feedback helper for custom template selection."],
+  ["ATS-safe design warnings", "Photos use, creative template warnings, margins scanner", "100%", "Alerts pop up dynamically during template selection."],
+  ["Template customization UX", "Designer layout builder sidebar", "100%", "Sidebar navigation is fully integrated and functional."],
+  ["Icon library integration", "Contact and section SVG inline graphics", "80%", "Include Lucide or FontAwesome icon packages."],
 ];
 
 function authHeaders(): HeadersInit {
