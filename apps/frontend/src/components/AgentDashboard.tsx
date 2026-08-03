@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 const API = import.meta.env.VITE_API_BASE ?? "http://localhost:8000/api/v1";
+const OLLAMA_BASE = import.meta.env.VITE_OLLAMA_BASE_URL ?? "http://127.0.0.1:11434";
 
 interface AgentTask {
   id: number;
@@ -13,6 +14,13 @@ interface AgentTask {
   started_at: string | null;
   completed_at: string | null;
   created_at: string;
+}
+
+interface AutoSubmitPolicyView {
+  tenant_id: number;
+  global_enabled: boolean;
+  tenant_enabled: boolean;
+  effective_enabled: boolean;
 }
 
 function authHeaders(): HeadersInit {
@@ -36,9 +44,21 @@ export default function AgentDashboard() {
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ollamaBusy, setOllamaBusy] = useState(false);
+  const [ollamaModel, setOllamaModel] = useState("gemma4:12b");
+  const [ollamaPrompt, setOllamaPrompt] = useState("Reply with OK_FROM_PROJOBS");
+  const [ollamaModels, setOllamaModels] = useState<string[]>([]);
+  const [ollamaResponse, setOllamaResponse] = useState<string>("");
+  const [ollamaError, setOllamaError] = useState<string | null>(null);
+  const [policyView, setPolicyView] = useState<AutoSubmitPolicyView | null>(null);
+  const [policyLoading, setPolicyLoading] = useState(false);
+  const [policySaving, setPolicySaving] = useState(false);
+  const [policyError, setPolicyError] = useState<string | null>(null);
+  const [policyStatus, setPolicyStatus] = useState<string>("");
 
   useEffect(() => {
     loadTasks();
+    loadPolicy();
   }, []);
 
   const loadTasks = async () => {
@@ -49,9 +69,12 @@ export default function AgentDashboard() {
       if (response.ok) {
         const body = await response.json();
         setTasks(body.data ?? []);
+        return;
       }
+      // Keep dashboard usable when backend auth/API is unavailable.
+      setTasks([]);
     } catch {
-      setError("Failed to load tasks");
+      setTasks([]);
     }
   };
 
@@ -125,6 +148,125 @@ export default function AgentDashboard() {
     }
   };
 
+  const loadOllamaModels = async () => {
+    setOllamaBusy(true);
+    setOllamaError(null);
+    try {
+      const response = await fetch(`${OLLAMA_BASE}/api/tags`);
+      if (!response.ok) {
+        throw new Error(`Ollama /api/tags failed (${response.status})`);
+      }
+
+      const body = await response.json();
+      const models = Array.isArray(body?.models)
+        ? body.models
+            .map((m: { name?: unknown }) => (typeof m.name === "string" ? m.name : ""))
+            .filter(Boolean)
+        : [];
+
+      setOllamaModels(models);
+      if (models.length > 0 && !models.includes(ollamaModel)) {
+        setOllamaModel(models[0]);
+      }
+    } catch (err) {
+      setOllamaError(err instanceof Error ? err.message : "Could not reach Ollama");
+    } finally {
+      setOllamaBusy(false);
+    }
+  };
+
+  const loadPolicy = async () => {
+    setPolicyLoading(true);
+    setPolicyError(null);
+    try {
+      const response = await fetch(`${API}/automation/auto-submit-policy`, {
+        headers: authHeaders(),
+      });
+
+      if (response.status === 403) {
+        setPolicyError("Tenant admin access is required to view auto-submit policy.");
+        setPolicyView(null);
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`Policy check failed (${response.status})`);
+      }
+
+      const body = await response.json();
+      setPolicyView(body as AutoSubmitPolicyView);
+    } catch (err) {
+      setPolicyError(err instanceof Error ? err.message : "Could not load policy status");
+      setPolicyView(null);
+    } finally {
+      setPolicyLoading(false);
+    }
+  };
+
+  const updatePolicy = async (enabled: boolean) => {
+    setPolicySaving(true);
+    setPolicyError(null);
+    setPolicyStatus("Saving policy...");
+
+    try {
+      const response = await fetch(`${API}/automation/auto-submit-policy`, {
+        method: "PUT",
+        headers: authHeaders(),
+        body: JSON.stringify({ enabled }),
+      });
+
+      if (response.status === 403) {
+        throw new Error("Tenant admin access is required to update policy.");
+      }
+
+      if (!response.ok) {
+        throw new Error(`Policy update failed (${response.status})`);
+      }
+
+      const body = (await response.json()) as AutoSubmitPolicyView;
+      setPolicyView(body);
+      setPolicyStatus(enabled ? "Auto-submit enabled for this tenant." : "Auto-submit disabled for this tenant.");
+    } catch (err) {
+      setPolicyError(err instanceof Error ? err.message : "Could not update policy");
+      setPolicyStatus("");
+    } finally {
+      setPolicySaving(false);
+    }
+  };
+
+  const testOllamaModel = async () => {
+    setOllamaBusy(true);
+    setOllamaError(null);
+    setOllamaResponse("");
+
+    try {
+      const response = await fetch(`${OLLAMA_BASE}/api/generate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: ollamaModel,
+          prompt: ollamaPrompt,
+          stream: false,
+        }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Ollama /api/generate failed (${response.status}): ${text}`);
+      }
+
+      const body = await response.json();
+      const reply = typeof body?.response === "string" ? body.response : "No response text returned.";
+      setOllamaResponse(reply);
+    } catch (err) {
+      setOllamaError(err instanceof Error ? err.message : "Model test failed");
+    } finally {
+      setOllamaBusy(false);
+    }
+  };
+
   return (
     <div className="agent-dashboard">
       <h2>Multi-Agent Orchestration</h2>
@@ -132,6 +274,82 @@ export default function AgentDashboard() {
         Extension: RobinBakshi/ollama-direct-custom-agent
       </p>
       {error && <p className="error">{error}</p>}
+
+      <div className="policy-card">
+        <h3>Apply Automation Policy</h3>
+        {policyLoading && <p className="subtitle">Loading policy...</p>}
+        {!policyLoading && policyView && (
+          <>
+            <div className="policy-grid">
+              <div><strong>Global:</strong> {policyView.global_enabled ? "Enabled" : "Disabled"}</div>
+              <div><strong>Tenant:</strong> {policyView.tenant_enabled ? "Enabled" : "Disabled"}</div>
+              <div><strong>Effective:</strong> {policyView.effective_enabled ? "Enabled" : "Blocked"}</div>
+            </div>
+            {!policyView.effective_enabled && (
+              <p className="policy-warning">
+                Apply runs are blocked by policy. Enable tenant policy and ensure global worker auto-submit is enabled.
+              </p>
+            )}
+            <div className="task-actions">
+              <button onClick={() => updatePolicy(true)} disabled={policySaving}>
+                {policySaving ? "Saving..." : "Enable Tenant Auto-Submit"}
+              </button>
+              <button onClick={() => updatePolicy(false)} disabled={policySaving}>
+                {policySaving ? "Saving..." : "Disable Tenant Auto-Submit"}
+              </button>
+              <button onClick={loadPolicy} disabled={policyLoading || policySaving}>
+                Refresh Policy
+              </button>
+            </div>
+            {policyStatus && <p className="subtitle">{policyStatus}</p>}
+          </>
+        )}
+        {policyError && <p className="error">{policyError}</p>}
+      </div>
+
+      <div className="ollama-card">
+        <h3>Ollama Diagnostics</h3>
+        <p className="subtitle">Endpoint: {OLLAMA_BASE}</p>
+        <div className="dispatch-form">
+          <div className="task-actions">
+            <button onClick={loadOllamaModels} disabled={ollamaBusy}>
+              {ollamaBusy ? "Checking..." : "List Models"}
+            </button>
+          </div>
+          {ollamaModels.length > 0 && (
+            <select
+              value={ollamaModel}
+              onChange={(e) => setOllamaModel(e.target.value)}
+            >
+              {ollamaModels.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          )}
+          {ollamaModels.length === 0 && (
+            <input
+              placeholder="Model name (e.g. gemma4:12b)"
+              value={ollamaModel}
+              onChange={(e) => setOllamaModel(e.target.value)}
+            />
+          )}
+          <textarea
+            rows={2}
+            placeholder="Prompt"
+            value={ollamaPrompt}
+            onChange={(e) => setOllamaPrompt(e.target.value)}
+          />
+          <div className="task-actions">
+            <button onClick={testOllamaModel} disabled={ollamaBusy || !ollamaModel.trim()}>
+              {ollamaBusy ? "Testing..." : "Test Model"}
+            </button>
+          </div>
+          {ollamaError && <p className="error">{ollamaError}</p>}
+          {ollamaResponse && <pre className="ollama-output">{ollamaResponse}</pre>}
+        </div>
+      </div>
 
       <div className="mode-toggle">
         <button

@@ -11,10 +11,14 @@ class WorkerTask extends Model
         'tenant_id',
         'user_id',
         'task_type',
+        'runbook_version',
         'idempotency_key',
         'foreign_ref_id',
         'payload_json',
+        'retry_policy_json',
         'status',
+        'checkpoint_code',
+        'state_reason',
         'attempts',
         'next_retry_at',
         'last_error',
@@ -23,6 +27,7 @@ class WorkerTask extends Model
     protected $casts = [
         'next_retry_at' => 'datetime',
         'payload_json' => 'array',
+        'retry_policy_json' => 'array',
     ];
 
     public function tenant(): BelongsTo

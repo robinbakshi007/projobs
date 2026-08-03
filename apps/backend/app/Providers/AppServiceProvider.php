@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Log;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -19,6 +20,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        if ((bool) config('services.worker.auto_submit_enabled', false)) {
+            Log::warning('WORKER_AUTO_SUBMIT_ENABLED is true. Ensure tenant-level policy, audit logging, and review safeguards are in place.');
+        }
     }
 }

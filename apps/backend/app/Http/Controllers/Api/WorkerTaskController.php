@@ -43,6 +43,10 @@ class WorkerTaskController extends Controller
             'queued' => (int) ($counts['queued'] ?? 0),
             'running' => (int) ($counts['running'] ?? 0),
             'succeeded' => (int) ($counts['succeeded'] ?? 0),
+            'waiting_for_code' => (int) ($counts['waiting_for_code'] ?? 0),
+            'waiting_for_review' => (int) ($counts['waiting_for_review'] ?? 0),
+            'blocked' => (int) ($counts['blocked'] ?? 0),
+            'completed' => (int) ($counts['completed'] ?? 0),
             'failed' => (int) ($counts['failed'] ?? 0),
             'dead_letter' => (int) ($counts['dead_letter'] ?? 0),
         ]);

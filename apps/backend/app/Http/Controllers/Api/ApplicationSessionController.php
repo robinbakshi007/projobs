@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\ApplicationQuota;
 use App\Models\ApplicationSession;
+use App\Services\AutoSubmitPolicyService;
 use App\Services\WorkerClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,7 +18,10 @@ class ApplicationSessionController extends Controller
 {
     use ResolvesApiUser;
 
-    public function __construct(private readonly WorkerClient $workerClient) {}
+    public function __construct(
+        private readonly WorkerClient $workerClient,
+        private readonly AutoSubmitPolicyService $autoSubmitPolicy,
+    ) {}
 
     public function start(Request $request): JsonResponse
     {
@@ -74,14 +78,16 @@ class ApplicationSessionController extends Controller
         ]);
 
         $jobIds = array_slice($validated['user_selected_job_ids'], 0, $acceptedCount);
+        $applicationIds = [];
         foreach ($jobIds as $jobId) {
-            Application::create([
+            $application = Application::create([
                 'tenant_id'      => $tenantId,
                 'user_id'        => $userId,
                 'job_listing_id' => $jobId,
                 'session_id'     => $session->id,
                 'status'         => 'pending',
             ]);
+            $applicationIds[] = $application->id;
         }
 
         $quota->reserved_count += $acceptedCount;
@@ -92,12 +98,15 @@ class ApplicationSessionController extends Controller
         //  Enqueue the apply task in the Python worker                       //
         // ------------------------------------------------------------------ //
         $workerTask = null;
-        if (! ($validated['dry_run'] ?? false) && $acceptedCount > 0) {
+        $autoSubmitEnabled = $this->autoSubmitPolicy->isEnabledForTenant($this->currentTenant());
+
+        if (! ($validated['dry_run'] ?? false) && $acceptedCount > 0 && $autoSubmitEnabled) {
             $workerTask = $this->workerClient->enqueue(
                 taskType:     'apply',
                 payload:      [
                     'session_id' => $session->id,
                     'job_ids'    => $jobIds,
+                    'application_ids' => $applicationIds,
                     'mode'       => $validated['mode'],
                     'idempotency_key' => $idempotencyKey !== '' ? $idempotencyKey : (string) $session->id,
                 ],
@@ -113,6 +122,7 @@ class ApplicationSessionController extends Controller
             'rejected_count' => $requested - $acceptedCount,
             'quota_remaining'=> max($remaining - $acceptedCount, 0),
             'worker_task_id' => $workerTask?->id,
+            'auto_submit_enabled' => $autoSubmitEnabled,
         ];
 
         if ($idempotencyKey !== '') {

@@ -39,6 +39,7 @@ return [
         'url' => env('WORKER_BASE_URL', 'http://localhost:8001'),
         'callback_key' => env('WORKER_INTERNAL_KEY', 'local-worker'),
         'callback_secret' => env('WORKER_INTERNAL_SECRET', ''),
+        'auto_submit_enabled' => (bool) env('WORKER_AUTO_SUBMIT_ENABLED', false),
     ],
 
     'openai' => [
